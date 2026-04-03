@@ -5,8 +5,10 @@ const config: CapacitorConfig = {
   appName: "SQUAD",
   webDir: "dist",
   server: {
-    androidScheme: "https",
+    androidScheme: "http",
     iosScheme: "https",
+    cleartext: true,
+    allowNavigation: ["*"],
   },
   plugins: {
     SplashScreen: {

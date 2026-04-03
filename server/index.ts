@@ -44,6 +44,6 @@ app.use("/api/admin", adminRoutes);
 setupSocketIO(httpServer);
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`SQUAD API server running on port ${PORT}`);
+httpServer.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`SQUAD API server running on 0.0.0.0:${PORT}`);
 });
