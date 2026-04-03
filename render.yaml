@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: squad-api
+    runtime: node
+    region: oregon
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npx tsx index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_j7nAH3bmJXVg@ep-proud-dew-an9g7ok1-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require
+    plan: free

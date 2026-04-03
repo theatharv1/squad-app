@@ -58,3 +58,4 @@ server/node_modules
 
 # Claude
 .claude/
+.vercel
