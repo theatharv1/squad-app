@@ -2,88 +2,101 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
-import { NOTIFICATIONS } from "@/data/mockData";
-import { getReadNotifications, markNotificationRead, markAllNotificationsRead } from "@/lib/storage";
-import MobileFrame from "@/components/layout/MobileFrame";
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/hooks/useNotifications";
+import { MobileFrame } from "@/components/layout/MobileFrame";
 
-const typeStyles: Record<string, string> = {
-  activity: "bg-success/20 text-success",
-  reminder: "bg-warning/20 text-warning",
-  social: "bg-accent/20 text-accent",
-  pool_full: "bg-primary/20 text-primary",
-  cancelled: "bg-destructive/20 text-destructive",
-  new_pool: "bg-primary/20 text-primary",
-  payment: "bg-success/20 text-success",
-  review: "bg-warning/20 text-warning",
-  milestone: "bg-primary/20 text-primary",
+const typeIcons: Record<string, string> = { activity: "⚡", reminder: "⏰", social: "👥", pool_full: "🎉", cancelled: "❌", new_pool: "🆕", payment: "💰", review: "⭐", milestone: "🏆" };
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
 };
 
-const typeIcons: Record<string, string> = {
-  activity: "🟢", reminder: "🟡", social: "🔵", pool_full: "🟠",
-  cancelled: "🔴", new_pool: "🟣", payment: "💰", review: "⭐", milestone: "🎉",
-};
-
-export default function Notifications() {
-  const navigate = useNavigate();
-  const [readIds, setReadIds] = useState(getReadNotifications());
+const Notifications = () => {
   const [filter, setFilter] = useState("all");
+  const navigate = useNavigate();
+  const { data, isLoading } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
-  const filtered = filter === "all" ? NOTIFICATIONS :
-    filter === "activity" ? NOTIFICATIONS.filter(n => ["activity", "pool_full", "cancelled", "reminder"].includes(n.type)) :
-    filter === "social" ? NOTIFICATIONS.filter(n => ["social", "review", "milestone"].includes(n.type)) :
-    NOTIFICATIONS.filter(n => n.type === "payment");
+  const notifications = data?.notifications || [];
+  const filtered = filter === "all" ? notifications
+    : filter === "activity" ? notifications.filter(n => ["activity","pool_full","cancelled","reminder"].includes(n.type))
+    : filter === "social" ? notifications.filter(n => ["social","review","milestone"].includes(n.type))
+    : notifications.filter(n => n.type === "payment");
 
-  const handleMarkAll = () => {
-    markAllNotificationsRead();
-    setReadIds(NOTIFICATIONS.map(n => n.id));
+  const handleTap = (n: any) => {
+    if (!n.isRead) markRead.mutate(n.id);
+    if (n.linkTo) navigate(n.linkTo);
   };
 
-  const handleTap = (n: typeof NOTIFICATIONS[0]) => {
-    markNotificationRead(n.id);
-    setReadIds(prev => [...prev, n.id]);
-    if (n.linkTo) navigate(n.linkTo);
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
   return (
     <MobileFrame>
-      <div className="min-h-screen">
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
-            <h1 className="font-heading text-lg font-bold">Notifications</h1>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-8">
+        {/* Glass Header */}
+        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}><ArrowLeft size={20} /></motion.button>
+              <h1 className="font-heading text-lg font-bold">Notifications</h1>
+            </div>
+            <button onClick={() => markAllRead.mutate()} className="text-xs text-primary font-semibold flex items-center gap-1 gradient-primary-subtle px-2.5 py-1 rounded-full">
+              <Check size={14} /> Mark all read
+            </button>
           </div>
-          <button onClick={handleMarkAll} className="text-xs text-primary font-medium">Mark all read</button>
+          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-2" />
         </div>
 
-        <div className="flex gap-2 px-4 mb-3">
-          {["all", "activity", "social", "payments"].map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={`text-xs px-3 py-1.5 rounded-full capitalize ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{f}</button>
+        {/* Filter Pills */}
+        <div className="flex gap-2 px-4 mt-3">
+          {["all","activity","social","payments"].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`pill capitalize ${filter === f ? "pill-active" : "pill-inactive"}`}
+            >{f}</button>
           ))}
         </div>
 
-        <div className="flex flex-col">
-          {filtered.map(n => {
-            const isRead = readIds.includes(n.id);
-            return (
-              <motion.button
-                key={n.id}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleTap(n)}
-                className={`flex items-start gap-3 px-4 py-3 text-left transition-colors ${!isRead ? "border-l-2 border-l-primary" : ""}`}
-              >
-                <span className="text-base mt-0.5">{typeIcons[n.type]}</span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm leading-snug ${!isRead ? "font-medium" : "text-muted-foreground"}`}>{n.text}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">{n.timestamp}</p>
-                </div>
-                {n.actionLabel && (
-                  <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full shrink-0">{n.actionLabel}</span>
-                )}
-              </motion.button>
-            );
-          })}
+        {/* Notification List */}
+        <div className="mt-3">
+          {isLoading ? (
+            <div className="space-y-2 px-4">{[1,2,3].map(i => <div key={i} className="shimmer rounded-2xl h-14" />)}</div>
+          ) : (
+            <motion.div variants={container} initial="hidden" animate="show">
+              {filtered.map(n => (
+                <motion.div key={n.id} variants={item}
+                  whileTap={{ scale: 0.98 }} onClick={() => handleTap(n)}
+                  className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-secondary/30 ${!n.isRead ? "border-l-2 border-primary bg-primary/5" : ""}`}>
+                  <span className="w-8 h-8 rounded-full gradient-primary-subtle flex items-center justify-center text-sm shrink-0">
+                    {typeIcons[n.type] || "📌"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${!n.isRead ? "font-semibold" : "text-muted-foreground"}`}>{n.text}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{formatTime(n.createdAt)}</p>
+                  </div>
+                  {n.actionLabel && <span className="pill pill-inactive text-[10px] shrink-0">{n.actionLabel}</span>}
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </div>
-      </div>
+      </motion.div>
     </MobileFrame>
   );
-}
+};
+
+export default Notifications;

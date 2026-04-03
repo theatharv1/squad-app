@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A0A0F"/>
+      <stop offset="100%" stop-color="#1A1A2E"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF8C29"/>
+      <stop offset="100%" stop-color="#FF6B00"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4.32" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="144" height="144" rx="31.68" fill="url(#bg)"/>
+  <circle cx="72" cy="72" r="60.48" fill="none" stroke="url(#accent)" stroke-width="2.16" opacity="0.3"/>
+  <circle cx="72" cy="72" r="42.336" fill="none" stroke="url(#accent)" stroke-width="1.44" opacity="0.15"/>
+  <text x="72" y="75.2" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="900" fill="url(#accent)" text-anchor="middle" dominant-baseline="middle" filter="url(#glow)" letter-spacing="1.44">SQ</text>
+  <text x="72" y="97.6" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600" fill="#FFFFFF" text-anchor="middle" opacity="0.7" letter-spacing="2.88">SQUAD</text>
+</svg>

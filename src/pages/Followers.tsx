@@ -1,51 +1,86 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { USERS, CURRENT_USER } from "@/data/mockData";
-import { getFollowing, toggleFollow } from "@/lib/storage";
-import MobileFrame from "@/components/layout/MobileFrame";
+import { ArrowLeft, UserX } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUser, useFollowers, useFollowing, useFollow, useUnfollow } from "@/hooks/useUsers";
+import { MobileFrame } from "@/components/layout/MobileFrame";
 
-export default function Followers() {
-  const { userId } = useParams();
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+};
+
+const Followers = () => {
+  const { userId } = useParams<{ userId: string }>();
+  const { user: me } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"followers" | "following">("followers");
-  const [, setRefresh] = useState(0);
-  const following = getFollowing();
-  const user = userId === "user_me" || userId === "me" ? CURRENT_USER : USERS.find(u => u.id === userId);
-  const list = tab === "followers" ? USERS.slice(0, 8) : USERS.slice(0, 5);
+  const [tab, setTab] = useState("followers");
+  const actualId = userId === "me" ? me?.id : userId;
+
+  const { data: profileUser } = useUser(actualId);
+  const { data: followersData } = useFollowers(actualId);
+  const { data: followingData } = useFollowing(actualId);
+  const followMutation = useFollow();
+  const unfollowMutation = useUnfollow();
+
+  const users = tab === "followers" ? (followersData?.users || []) : (followingData?.users || []);
+  const counts = { followers: followersData?.total || 0, following: followingData?.total || 0 };
 
   return (
     <MobileFrame>
-      <div className="min-h-screen">
-        <div className="flex items-center gap-3 px-4 pt-4 pb-2 border-b border-border">
-          <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
-          <h1 className="font-heading text-lg font-bold">{user?.name || "User"}</h1>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-8">
+        {/* Glass Header */}
+        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}><ArrowLeft size={20} /></motion.button>
+            <h1 className="font-heading text-lg font-bold">{profileUser?.name || "User"}</h1>
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-3" />
         </div>
-        <div className="flex border-b border-border">
-          {(["followers", "following"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2.5 text-xs font-medium text-center capitalize relative ${tab === t ? "text-foreground" : "text-muted-foreground"}`}>
-              {t} {t === "followers" ? `(${user?.followers || 0})` : `(${user?.following || 0})`}
-              {tab === t && <motion.div layoutId="ftab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-            </button>
+
+        {/* Tab Switcher */}
+        <div className="flex gap-1 px-4 mt-4">
+          {["followers", "following"].map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`pill flex-1 py-2 text-sm font-medium capitalize ${tab === t ? "pill-active" : "pill-inactive"}`}
+            >{t} ({counts[t as keyof typeof counts]})</button>
           ))}
         </div>
-        <div className="flex flex-col">
-          {list.map(u => (
-            <div key={u.id} className="flex items-center gap-3 px-4 py-3">
-              <img src={u.avatar} alt="" className="w-10 h-10 rounded-full cursor-pointer" onClick={() => navigate(`/profile/${u.id}`)} />
+
+        {/* User List */}
+        <motion.div variants={container} initial="hidden" animate="show" className="px-4 mt-4 space-y-3">
+          {users.map((u: any) => (
+            <motion.div key={u.id} variants={item} className="flex items-center gap-3">
+              <img src={u.avatarUrl || ""} className="w-10 h-10 rounded-full avatar-ring cursor-pointer" onClick={() => navigate(`/profile/${u.id}`)} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{u.name}</p>
-                <p className="text-xs text-muted-foreground">{u.username} · {u.city}</p>
+                <p className="font-medium text-sm">{u.name}</p>
+                <p className="text-xs text-muted-foreground">@{u.username} · {u.city}</p>
               </div>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => { toggleFollow(u.id); setRefresh(r => r + 1); }}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full ${following.includes(u.id) ? "bg-secondary" : "bg-primary text-primary-foreground"}`}>
-                {following.includes(u.id) ? "Following" : "Follow"}
-              </motion.button>
-            </div>
+              {u.id !== me?.id && (
+                <button onClick={async () => {
+                  if (u.isFollowing) await unfollowMutation.mutateAsync(u.id);
+                  else await followMutation.mutateAsync(u.id);
+                }} className={`${u.isFollowing ? "btn-secondary" : "btn-primary"} px-3 py-1 rounded-full text-xs font-semibold`}>
+                  {u.isFollowing ? "Following" : "Follow"}
+                </button>
+              )}
+            </motion.div>
           ))}
-        </div>
-      </div>
+          {users.length === 0 && (
+            <div className="flex flex-col items-center py-12 text-muted-foreground">
+              <UserX size={40} className="mb-3 opacity-50" />
+              <p className="text-sm">No {tab} yet</p>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
     </MobileFrame>
   );
-}
+};
+
+export default Followers;

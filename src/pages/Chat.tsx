@@ -2,81 +2,125 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Info, Send } from "lucide-react";
-import { CONVERSATIONS } from "@/data/mockData";
-import MobileFrame from "@/components/layout/MobileFrame";
+import { useMessages, useSendMessage } from "@/hooks/useMessages";
+import { useConversations } from "@/hooks/useMessages";
+import { useAuth } from "@/contexts/AuthContext";
+import { MobileFrame } from "@/components/layout/MobileFrame";
+import { connectSocket, getSocket } from "@/lib/socket";
+import type { Message } from "@/types";
 
-export default function Chat() {
-  const { id } = useParams();
+const Chat = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const conv = CONVERSATIONS.find(c => c.id === id);
-  const [messages, setMessages] = useState(conv?.messages || []);
+  const { user } = useAuth();
+  const { data: allConvs = [] } = useConversations();
+  const { data: fetchedMessages = [], refetch } = useMessages(id);
+  const sendMutation = useSendMessage();
+  const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const conv = allConvs.find(c => c.id === id);
+  const messages = [...fetchedMessages, ...localMessages];
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]);
 
-  if (!conv) return <MobileFrame><div className="p-4"><button onClick={() => navigate(-1)} className="text-sm text-primary">Go back</button></div></MobileFrame>;
+  // Socket.io for real-time
+  useEffect(() => {
+    const socket = connectSocket() || getSocket();
+    if (!socket || !id) return;
 
-  const handleSend = () => {
-    if (!text.trim()) return;
-    setMessages(prev => [...prev, {
-      id: `m_${Date.now()}`,
-      sender: "Yathu",
-      senderAvatar: "",
-      text: text.trim(),
-      time: "Just now",
-      isMe: true,
-    }]);
+    socket.emit("join_conversation", id);
+
+    const handler = (data: { conversationId: string; message: Message }) => {
+      if (data.conversationId === id && data.message.senderId !== user?.id) {
+        setLocalMessages(prev => [...prev, { ...data.message, isMe: false }]);
+      }
+    };
+    socket.on("new_message", handler);
+
+    return () => {
+      socket.off("new_message", handler);
+      socket.emit("leave_conversation", id);
+    };
+  }, [id, user?.id]);
+
+  // Clear local messages when fetched messages update
+  useEffect(() => { setLocalMessages([]); }, [fetchedMessages]);
+
+  const handleSend = async () => {
+    if (!text.trim() || !id) return;
+    const msg = text.trim();
     setText("");
+
+    // Optimistic local add
+    setLocalMessages(prev => [...prev, {
+      id: `local_${Date.now()}`,
+      sender: user?.name || "",
+      senderAvatar: user?.avatarUrl || "",
+      senderId: user?.id || "",
+      text: msg,
+      time: new Date().toISOString(),
+      isMe: true,
+      isSystem: false,
+    }]);
+
+    // Also send via socket for real-time
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("send_message", { conversationId: id, text: msg });
+    } else {
+      await sendMutation.mutateAsync({ conversationId: id, text: msg });
+    }
+  };
+
+  const formatTime = (t: string) => {
+    const d = new Date(t);
+    if (isNaN(d.getTime())) return t;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   return (
     <MobileFrame>
-      <div className="flex flex-col h-screen">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background flex flex-col">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0">
-          <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
-          <img src={conv.avatar} alt="" className="w-8 h-8 rounded-full" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{conv.name}</p>
-            {conv.isGroup && <p className="text-[10px] text-muted-foreground">{conv.members} members</p>}
+        <div className="sticky top-0 z-30 glass-strong px-4 py-3 flex items-center gap-3">
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </motion.button>
+          <img src={conv?.avatar || ""} className="w-8 h-8 rounded-full avatar-ring" />
+          <div className="flex-1">
+            <p className="font-semibold text-sm">{conv?.name || "Chat"}</p>
+            {conv?.isGroup && <p className="text-xs text-muted-foreground">{conv.members} members</p>}
           </div>
-          <button><Info size={18} className="text-muted-foreground" /></button>
+          <button><Info size={20} className="text-muted-foreground" /></button>
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {messages.map((msg, i) => {
             if (msg.isSystem) {
               return (
-                <div key={msg.id} className="text-center">
-                  <span className="text-[10px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{msg.text}</span>
-                </div>
+                <motion.div key={msg.id}
+                  initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                  className="text-center">
+                  <span className="text-xs glass px-3 py-1 rounded-full text-muted-foreground inline-block">{msg.text}</span>
+                </motion.div>
               );
             }
-            const showName = !msg.isMe && conv.isGroup && (i === 0 || messages[i - 1]?.sender !== msg.sender || messages[i - 1]?.isSystem);
+            const showSender = conv?.isGroup && !msg.isMe && (i === 0 || messages[i-1]?.senderId !== msg.senderId);
             return (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-2 ${msg.isMe ? "justify-end" : "justify-start"}`}
-              >
-                {!msg.isMe && showName && (
-                  <img src={msg.senderAvatar} alt="" className="w-6 h-6 rounded-full mt-auto shrink-0" />
-                )}
-                {!msg.isMe && !showName && <div className="w-6 shrink-0" />}
-                <div className={`max-w-[75%] ${msg.isMe ? "order-first" : ""}`}>
-                  {showName && <p className="text-[10px] text-muted-foreground mb-0.5 ml-1">{msg.sender}</p>}
-                  <div className={`px-3 py-2 rounded-2xl text-sm ${
-                    msg.isMe ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary rounded-bl-md"
-                  }`}>
-                    {msg.text}
-                  </div>
-                  <p className={`text-[9px] text-muted-foreground mt-0.5 ${msg.isMe ? "text-right" : "text-left"} mx-1`}>{msg.time}</p>
+              <motion.div key={msg.id}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
+                {showSender && <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.sender}</span>}
+                <div className={`max-w-[75%] px-3.5 py-2 text-sm ${msg.isMe ? "gradient-primary text-primary-foreground rounded-2xl rounded-br-md" : "glass rounded-2xl rounded-bl-md"}`}>
+                  {msg.text}
                 </div>
+                <span className="text-[10px] text-muted-foreground mt-0.5 px-1">{formatTime(msg.time)}</span>
               </motion.div>
             );
           })}
@@ -84,26 +128,21 @@ export default function Chat() {
         </div>
 
         {/* Input */}
-        <div className="px-4 py-3 border-t border-border bg-background shrink-0">
-          <div className="flex items-center gap-2">
-            <input
-              value={text}
-              onChange={e => setText(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSend()}
-              placeholder="Type a message..."
-              className="flex-1 bg-secondary rounded-xl px-3 py-2.5 text-sm outline-none"
-            />
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={handleSend}
-              disabled={!text.trim()}
-              className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
-            >
-              <Send size={16} />
-            </motion.button>
-          </div>
+        <div className="sticky bottom-0 p-3 glass-strong flex items-center gap-2">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+          <input value={text} onChange={e => setText(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSend()}
+            className="input-premium flex-1 rounded-full px-4 py-2.5"
+            placeholder="Type a message..." />
+          <motion.button whileTap={{ scale: 0.9 }} onClick={handleSend}
+            disabled={!text.trim()}
+            className="w-10 h-10 gradient-primary shadow-glow rounded-full flex items-center justify-center disabled:opacity-50">
+            <Send size={16} className="text-primary-foreground" />
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
     </MobileFrame>
   );
-}
+};
+
+export default Chat;

@@ -1,67 +1,90 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { CURRENT_USER, CATEGORIES, CITIES } from "@/data/mockData";
-import { getProfile, saveProfile } from "@/lib/storage";
-import MobileFrame from "@/components/layout/MobileFrame";
+import { CATEGORIES, CITIES } from "@/constants";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUpdateProfile } from "@/hooks/useUsers";
+import { MobileFrame } from "@/components/layout/MobileFrame";
 import { toast } from "sonner";
 
-export default function EditProfile() {
+const EditProfile = () => {
   const navigate = useNavigate();
-  const saved = getProfile();
-  const [name, setName] = useState(saved.name || CURRENT_USER.name);
-  const [bio, setBio] = useState(saved.bio || CURRENT_USER.bio);
-  const [city, setCity] = useState(saved.city || CURRENT_USER.city);
-  const [sports, setSports] = useState<string[]>(saved.sports || CURRENT_USER.sportsPlayed);
+  const { user, refreshUser } = useAuth();
+  const updateProfile = useUpdateProfile();
+  const [name, setName] = useState(user?.name || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [city, setCity] = useState(user?.city || "Bhopal");
+  const [sports, setSports] = useState<string[]>(user?.sportsPlayed || []);
 
   const toggleSport = (s: string) => setSports(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
 
-  const handleSave = () => {
-    saveProfile({ name, bio, city, sports });
-    toast.success("Profile updated!");
-    navigate(-1);
+  const handleSave = async () => {
+    try {
+      await updateProfile.mutateAsync({ name, bio, city, sportsPlayed: sports } as any);
+      await refreshUser();
+      toast.success("Profile updated!");
+      navigate(-1);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   return (
     <MobileFrame>
-      <div className="min-h-screen flex flex-col">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
-          <span className="text-sm font-medium">Edit Profile</span>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-8">
+        {/* Glass Header */}
+        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}><ArrowLeft size={20} /></motion.button>
+            <h1 className="font-heading text-lg font-bold">Edit Profile</h1>
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-3" />
         </div>
-        <div className="flex-1 px-4 py-4 flex flex-col gap-4">
-          <div className="flex justify-center">
-            <img src={CURRENT_USER.avatar} alt="" className="w-20 h-20 rounded-full border-2 border-border" />
+
+        <div className="flex justify-center mt-6">
+          <img src={user?.avatarUrl || ""} className="w-20 h-20 rounded-full avatar-ring shadow-glow" />
+        </div>
+
+        <div className="px-4 mt-6 space-y-4">
+          <div>
+            <label className="text-sm text-muted-foreground">Name</label>
+            <input value={name} onChange={e => setName(e.target.value)}
+              className="input-premium w-full mt-1" />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-secondary rounded-xl px-3 py-2.5 text-sm outline-none" />
+            <label className="text-sm text-muted-foreground">Bio</label>
+            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3}
+              className="input-premium w-full mt-1 resize-none" />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Bio</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} className="w-full bg-secondary rounded-xl px-3 py-2.5 text-sm outline-none resize-none h-20" />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">City</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="text-sm text-muted-foreground">City</label>
+            <div className="flex flex-wrap gap-2 mt-1">
               {CITIES.map(c => (
-                <button key={c} onClick={() => setCity(c)} className={`text-xs px-3 py-1.5 rounded-full ${city === c ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{c}</button>
+                <button key={c} onClick={() => setCity(c)}
+                  className={`pill ${city === c ? "pill-active" : "pill-inactive"}`}
+                >{c}</button>
               ))}
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Sports & Interests</label>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map(c => (
-                <button key={c.id} onClick={() => toggleSport(c.label)} className={`text-xs px-3 py-1.5 rounded-full ${sports.includes(c.label) ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{c.emoji} {c.label}</button>
+            <label className="text-sm text-muted-foreground">Sports & Interests</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {CATEGORIES.map(cat => (
+                <button key={cat.id} onClick={() => toggleSport(cat.label)}
+                  className={`pill ${sports.includes(cat.label) ? "pill-active" : "pill-inactive"}`}
+                >{cat.emoji} {cat.label}</button>
               ))}
             </div>
           </div>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={handleSave} disabled={updateProfile.isPending}
+            className="btn-primary w-full font-bold py-3.5 rounded-xl disabled:opacity-50 mt-2 shadow-glow">
+            {updateProfile.isPending ? "Saving..." : "Save Changes"}
+          </motion.button>
         </div>
-        <div className="p-4 border-t border-border">
-          <button onClick={handleSave} className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm">Save Changes</button>
-        </div>
-      </div>
+      </motion.div>
     </MobileFrame>
   );
-}
+};
+
+export default EditProfile;

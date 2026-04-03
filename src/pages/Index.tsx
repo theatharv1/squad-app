@@ -1,11 +1,18 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isOnboarded } from "@/lib/storage";
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function Index() {
+const Index = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    navigate(isOnboarded() ? "/home" : "/onboarding", { replace: true });
-  }, [navigate]);
+    if (loading) return;
+    if (user) navigate("/home");
+    else navigate("/login");
+  }, [user, loading, navigate]);
+
   return null;
-}
+};
+
+export default Index;
