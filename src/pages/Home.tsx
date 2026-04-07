@@ -17,6 +17,9 @@ import { TonightVibe } from "@/components/TonightVibe";
 import { WeeklyRitual } from "@/components/WeeklyRitual";
 import { JoinTicker } from "@/components/JoinTicker";
 import { EndingTonight } from "@/components/EndingTonight";
+import { DailyPicks } from "@/components/DailyPicks";
+import { SquadSaturday } from "@/components/SquadSaturday";
+import { TravelerToggle } from "@/components/TravelerToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trackOpen, getTimeContext, getXPToday, DAILY_XP_GOAL } from "@/lib/engagement";
 
@@ -73,7 +76,9 @@ const Home = () => {
                 <SheetHeader>
                   <SheetTitle className="font-display text-2xl text-left">Pick your city</SheetTitle>
                 </SheetHeader>
-                <div className="grid grid-cols-2 gap-2.5 mt-5 pb-6">
+                {/* Traveler toggle — Hinge Travel Mode pattern */}
+                <TravelerToggle city={city} />
+                <div className="grid grid-cols-2 gap-2.5 pb-6">
                   {CITIES.map(c => (
                     <motion.button
                       key={c}
@@ -191,9 +196,20 @@ const Home = () => {
           <TonightVibe />
         </motion.div>
 
+        {/* Daily Picks — "Tonight: 3 picks for you" (Hinge Most Compatible).
+            Highest-leverage re-engagement surface per the playbook. */}
+        <div className="mt-5">
+          <DailyPicks pools={allPools} />
+        </div>
+
         {/* Weekly Ritual (Tue-Wed only) — Timeleft pattern */}
         <div className="px-5 mt-4">
           <WeeklyRitual />
+        </div>
+
+        {/* Squad Saturday (Fri-Sat only) — companion to WeeklyRitual */}
+        <div className="px-5 mt-4">
+          <SquadSaturday city={city} />
         </div>
 
         {/* Bento — live now + trending */}

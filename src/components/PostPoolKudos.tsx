@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { X, Star, Users, Sparkles } from "lucide-react";
 import { addXP, pingStreak } from "@/lib/engagement";
+import { RecapShareCard } from "@/components/RecapShareCard";
 import { toast } from "sonner";
 
 interface Props {
@@ -9,12 +10,13 @@ interface Props {
   poolTitle: string;
   attendees: { id: string; name: string; avatarUrl: string | null }[];
   onClose: () => void;
+  cityName?: string;
 }
 
 // Post-Pool Kudos modal — Strava kudos + Hinge "We Met" pattern.
 // Closes the IRL → digital → IRL loop.
 // Triggers within 30min of pool end. Drives reputation, retention, and re-pooling.
-export function PostPoolKudos({ open, poolTitle, attendees, onClose }: Props) {
+export function PostPoolKudos({ open, poolTitle, attendees, onClose, cityName }: Props) {
   const [step, setStep] = useState<"vibe" | "kudos" | "rebook" | "done">("vibe");
   const [vibe, setVibe] = useState<number | null>(null);
   const [kudos, setKudos] = useState<Set<string>>(new Set());
@@ -32,14 +34,16 @@ export function PostPoolKudos({ open, poolTitle, attendees, onClose }: Props) {
 
   function finish() {
     pingStreak();
+    addXP(25);
     toast.success(`+${15 + kudos.size * 5 + 25} XP · Streak +1`);
     setStep("done");
-    setTimeout(() => {
-      onClose();
-      setStep("vibe");
-      setVibe(null);
-      setKudos(new Set());
-    }, 1200);
+  }
+
+  function handleClose() {
+    onClose();
+    setStep("vibe");
+    setVibe(null);
+    setKudos(new Set());
   }
 
   function toggleKudos(id: string) {
@@ -57,7 +61,7 @@ export function PostPoolKudos({ open, poolTitle, attendees, onClose }: Props) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 backdrop-blur-md"
-          onClick={onClose}
+          onClick={handleClose}
         >
           <motion.div
             initial={{ y: "100%" }}
@@ -65,14 +69,14 @@ export function PostPoolKudos({ open, poolTitle, attendees, onClose }: Props) {
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 280 }}
             onClick={e => e.stopPropagation()}
-            className="relative w-full max-w-[430px] rounded-t-[32px] bg-card border-t border-x border-white/10 p-6 overflow-hidden"
+            className="relative w-full max-w-[430px] max-h-[92vh] overflow-y-auto scrollbar-hide rounded-t-[32px] bg-card border-t border-x border-white/10 p-6"
           >
             {/* Glow */}
             <div className="absolute -top-20 -right-20 w-60 h-60 bg-primary/20 rounded-full blur-[100px] pointer-events-none" />
             <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-secondary/20 rounded-full blur-[100px] pointer-events-none" />
 
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="absolute top-4 right-4 w-9 h-9 rounded-full glass flex items-center justify-center z-10"
             >
               <X size={16} />
@@ -213,20 +217,34 @@ export function PostPoolKudos({ open, poolTitle, attendees, onClose }: Props) {
                 </motion.div>
               )}
 
-              {/* Step: Done celebration */}
+              {/* Step: Done — recap share card (Strava activity-card pattern) */}
               {step === "done" && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center py-8"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
                 >
-                  <div className="inline-flex w-20 h-20 rounded-full bg-primary/15 border-2 border-primary items-center justify-center mb-4"
-                    style={{ boxShadow: "0 0 40px hsla(73, 100%, 50%, 0.5)" }}
-                  >
-                    <Sparkles size={32} className="text-primary" fill="currentColor" />
+                  <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">// Streak +1 · Locked in</div>
+                  <h2 className="font-display font-bold text-2xl mt-2 leading-tight">
+                    Drop it on your <span className="text-gradient-cyan-magenta">story</span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-2">Auto-generated. Tap once to share.</p>
+
+                  <div className="mt-5">
+                    <RecapShareCard
+                      poolTitle={poolTitle}
+                      vibeRating={vibe ?? 5}
+                      kudosCount={kudos.size}
+                      cityName={cityName}
+                    />
                   </div>
-                  <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">// Streak +1</div>
-                  <h2 className="font-display font-bold text-2xl mt-2">You're locked in</h2>
+
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleClose}
+                    className="mt-3 w-full py-3 rounded-full bg-white/[0.04] border border-white/10 text-[11px] font-mono uppercase tracking-wider font-bold"
+                  >
+                    Done
+                  </motion.button>
                 </motion.div>
               )}
             </div>

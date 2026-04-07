@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PoolCard } from "@/components/PoolCard";
 import { PostPoolKudos } from "@/components/PostPoolKudos";
 import { MobileFrame } from "@/components/layout/MobileFrame";
+import { resolvePoolTheme } from "@/lib/poolThemes";
 import { toast } from "sonner";
 
 const PoolDetail = () => {
@@ -65,6 +66,14 @@ const PoolDetail = () => {
   const dateStr = time.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   const dayNum = time.getDate();
   const monthStr = time.toLocaleDateString([], { month: "short" }).toUpperCase();
+  // Pool theme — Partiful pattern. Hero gradient + accent CTAs are themed.
+  const theme = resolvePoolTheme(pool);
+  // Strip the internal theme/cohost/fit tags from public display.
+  const visibleTags = (pool.tags || []).filter(
+    (t) => !t.startsWith("theme:") && !t.startsWith("cohost:") && !t.startsWith("fit:")
+  );
+  const dressCode = (pool.tags || []).find((t) => t.startsWith("fit:"))?.substring(4);
+  const coHostName = (pool.tags || []).find((t) => t.startsWith("cohost:"))?.substring(7);
 
   const handleJoin = async () => {
     try {
@@ -90,11 +99,16 @@ const PoolDetail = () => {
   return (
     <MobileFrame>
       <div className="min-h-screen pb-32">
-        {/* Hero gradient */}
-        <div className="relative h-72 overflow-hidden">
-          <div className="absolute inset-0 gradient-stage" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-primary/20 blur-[100px]" />
-          <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-secondary/15 blur-[80px]" />
+        {/* Hero — themed gradient (Partiful pattern) */}
+        <div className="relative h-72 overflow-hidden" style={{ backgroundImage: theme.gradient }}>
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] rounded-full blur-[120px]"
+            style={{ background: theme.accent + "33" }}
+          />
+          <div
+            className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full blur-[80px]"
+            style={{ background: theme.accent + "22" }}
+          />
           <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-background" />
 
           {/* Header buttons */}
@@ -118,7 +132,13 @@ const PoolDetail = () => {
           {/* Hero content */}
           <div className="relative z-10 h-full flex flex-col justify-end px-5 pb-8">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">{category?.label || pool.category}</span>
+              <span
+                className="text-[10px] font-mono uppercase tracking-[0.2em] inline-flex items-center gap-1"
+                style={{ color: theme.accent }}
+              >
+                <span>{theme.emoji}</span>
+                {category?.label || pool.category}
+              </span>
               {pool.isLive && (
                 <div className="tag tag-live">
                   <span className="pulse-dot" />
@@ -126,8 +146,10 @@ const PoolDetail = () => {
                 </div>
               )}
             </div>
-            <h1 className="text-display font-bold leading-none">{pool.title}</h1>
-            <p className="text-sm text-muted-foreground mt-2">at {pool.venue}</p>
+            <h1 className="text-display font-bold leading-none" style={{ color: theme.foreground }}>
+              {pool.title}
+            </h1>
+            <p className="text-sm mt-2" style={{ color: theme.foreground + "99" }}>at {pool.venue}</p>
           </div>
         </div>
 
@@ -269,16 +291,53 @@ const PoolDetail = () => {
             </motion.div>
           )}
 
+          {/* Dress code + Co-host (host signal) */}
+          {(dressCode || coHostName) && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.27 }}
+              className="mt-5 grid grid-cols-2 gap-2"
+            >
+              {dressCode && (
+                <div
+                  className="card-stage p-3"
+                  style={{ borderColor: theme.accent + "33" }}
+                >
+                  <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Dress code</div>
+                  <div className="font-display font-bold text-sm mt-0.5" style={{ color: theme.accent }}>{dressCode}</div>
+                </div>
+              )}
+              {coHostName && (
+                <div
+                  className="card-stage p-3"
+                  style={{ borderColor: theme.accent + "33" }}
+                >
+                  <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Co-host</div>
+                  <div className="font-display font-bold text-sm mt-0.5" style={{ color: theme.accent }}>@{coHostName}</div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* Tags */}
-          {pool.tags && pool.tags.length > 0 && (
+          {visibleTags.length > 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
               className="flex flex-wrap gap-2 mt-4"
             >
-              {pool.tags.map(t => (
-                <span key={t} className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] border border-white/10 text-foreground/70">
+              {visibleTags.map(t => (
+                <span
+                  key={t}
+                  className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider"
+                  style={{
+                    background: theme.accent + "12",
+                    border: `1px solid ${theme.accent}33`,
+                    color: theme.foreground,
+                  }}
+                >
                   #{t}
                 </span>
               ))}
@@ -362,15 +421,22 @@ const PoolDetail = () => {
           )}
         </div>
 
-        {/* Sticky CTA */}
+        {/* Sticky CTA — themed */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30 px-5 pb-5 pt-4 glass-strong">
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <div
+            className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: `linear-gradient(to right, transparent, ${theme.accent}80, transparent)` }}
+          />
           {pool.joined && endedRecently ? (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => setKudosOpen(true)}
-              className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2 bg-primary text-primary-foreground"
-              style={{ boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.45)" }}
+              className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2"
+              style={{
+                background: theme.accent,
+                color: "#0a0a0a",
+                boxShadow: `0 0 36px ${theme.glow}`,
+              }}
             >
               <Sparkles size={16} strokeWidth={2.5} fill="currentColor" />
               Rate the night · +60 XP
@@ -380,12 +446,20 @@ const PoolDetail = () => {
               whileTap={{ scale: 0.97 }}
               onClick={handleJoin}
               disabled={joinMutation.isPending || leaveMutation.isPending || (!pool.joined && spotsLeft === 0)}
-              className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all disabled:opacity-50 ${
+              className="w-full py-4 rounded-2xl font-display font-bold text-base transition-all disabled:opacity-50"
+              style={
                 pool.joined
-                  ? "bg-white/[0.06] border border-white/10 text-foreground"
-                  : "bg-primary text-primary-foreground"
-              }`}
-              style={!pool.joined ? { boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.4)" } : undefined}
+                  ? {
+                      background: "rgba(255,255,255,0.06)",
+                      border: `1px solid ${theme.accent}33`,
+                      color: theme.foreground,
+                    }
+                  : {
+                      background: theme.accent,
+                      color: "#0a0a0a",
+                      boxShadow: `0 0 36px ${theme.glow}`,
+                    }
+              }
             >
               {pool.joined ? "You're in · Leave?" : pool.costPerHead > 0 ? `Reserve · ₹${pool.costPerHead}` : "Reserve spot"}
             </motion.button>
@@ -396,6 +470,7 @@ const PoolDetail = () => {
         <PostPoolKudos
           open={kudosOpen}
           poolTitle={pool.title}
+          cityName={pool.city}
           attendees={(pool.participants || []).map(p => ({
             id: p.id,
             name: p.name,

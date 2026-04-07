@@ -5,6 +5,7 @@ import { CATEGORIES } from "@/constants";
 import { useJoinPool, useLeavePool } from "@/hooks/usePools";
 import { getPoolUrgency, addXP } from "@/lib/engagement";
 import { earnAchievement } from "@/lib/tiers";
+import { resolvePoolTheme } from "@/lib/poolThemes";
 import type { Pool } from "@/types";
 import { toast } from "sonner";
 
@@ -113,6 +114,9 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
   const spotsLeft = pool.spotsTotal - pool.spotsFilled;
   const fillPercent = Math.round((pool.spotsFilled / pool.spotsTotal) * 100);
   const mutuals = mutualsCount(pool);
+  // Partiful pattern: every pool gets a color theme. Host-picked overrides
+  // the deterministic fallback so the page reads as a "designed object."
+  const theme = resolvePoolTheme(pool);
 
   const handleJoin = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -188,18 +192,40 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
         onClick={() => navigate(`/pool/${pool.id}`)}
         className="relative cursor-pointer group"
       >
-        <div className="card-ticket p-5 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        <div
+          className="card-ticket p-5 relative overflow-hidden"
+          style={{
+            backgroundImage: theme.gradient,
+            borderColor: theme.accent + "40",
+            boxShadow: `0 0 0 1px ${theme.accent}22, 0 18px 50px -12px ${theme.glow}`,
+          }}
+        >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(120% 80% at 50% -20%, ${theme.accent}22 0%, transparent 60%)`,
+            }}
+          />
 
           <div className="relative">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{category?.label || pool.category}</span>
+                  <span
+                    className="text-[10px] font-mono uppercase tracking-[0.15em] inline-flex items-center gap-1"
+                    style={{ color: theme.accent }}
+                  >
+                    <span>{theme.emoji}</span>
+                    {category?.label || pool.category}
+                  </span>
                   <UrgencyChip pool={pool} />
                 </div>
-                <h3 className="font-display text-2xl font-bold mt-1 leading-none">{pool.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1.5">hosted by {pool.host.name}</p>
+                <h3 className="font-display text-2xl font-bold mt-1 leading-none" style={{ color: theme.foreground }}>
+                  {pool.title}
+                </h3>
+                <p className="text-xs mt-1.5" style={{ color: theme.foreground + "99" }}>
+                  hosted by {pool.host.name}
+                </p>
                 <div className="mt-1.5">
                   <HostCredibility pool={pool} />
                 </div>
@@ -248,11 +274,20 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
               whileTap={{ scale: 0.97 }}
               onClick={handleJoin}
               disabled={joinMutation.isPending || leaveMutation.isPending}
-              className={`w-full py-3 rounded-2xl font-display font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all ${
+              className="w-full py-3 rounded-2xl font-display font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all"
+              style={
                 pool.joined
-                  ? "bg-white/5 border border-white/10 text-foreground"
-                  : "bg-primary text-primary-foreground hover:shadow-[0_0_30px_hsla(73,100%,50%,0.5)]"
-              }`}
+                  ? {
+                      background: "rgba(255,255,255,0.06)",
+                      border: `1px solid ${theme.accent}33`,
+                      color: theme.foreground,
+                    }
+                  : {
+                      background: theme.accent,
+                      color: "#0a0a0a",
+                      boxShadow: `0 0 28px ${theme.glow}`,
+                    }
+              }
             >
               {pool.joined ? "You're In" : "Reserve Spot"}
               {!pool.joined && <ArrowUpRight size={16} strokeWidth={2.5} />}

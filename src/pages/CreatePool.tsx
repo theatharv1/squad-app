@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, ArrowRight, Calendar, MapPin, Users, Trophy, Sparkles, Shirt } from "lucide-react";
+import { ArrowLeft, X, ArrowRight, Calendar, MapPin, Users, Trophy, Sparkles, Shirt, Palette } from "lucide-react";
 import { CATEGORIES, CITIES } from "@/constants";
 import { getCity } from "@/lib/storage";
 import { useCreatePool } from "@/hooks/usePools";
 import { MobileFrame } from "@/components/layout/MobileFrame";
 import { addXP } from "@/lib/engagement";
 import { earnAchievement } from "@/lib/tiers";
+import { POOL_THEMES, type ThemeId, themeFor } from "@/lib/poolThemes";
 import { toast } from "sonner";
 
 const TIMES = Array.from({ length: 37 }, (_, i) => {
@@ -114,6 +115,9 @@ const CreatePool = () => {
   const [cost, setCost] = useState("");
   const [dressCode, setDressCode] = useState("");
   const [coHost, setCoHost] = useState("");
+  // Pool theme picker — Partiful "designed object" pattern.
+  // Default to "club-neon" so the host always sees a vibe pre-loaded.
+  const [themeId, setThemeId] = useState<ThemeId>("club-neon");
   const [publishing, setPublishing] = useState(false);
 
   const toggleTag = (t: string) => setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -157,11 +161,12 @@ const CreatePool = () => {
       scheduledDate.setHours(h, m, 0, 0);
     }
 
-    // Encode dress code + co-host into tags (back-compat with current backend
-    // schema). Future server work can split these into proper columns.
+    // Encode dress code + co-host + theme into tags (back-compat with current
+    // backend schema). Future server work can split these into proper columns.
     const enrichedTags = [...tags];
     if (dressCode) enrichedTags.push(`fit:${dressCode}`);
     if (coHost.trim()) enrichedTags.push(`cohost:${coHost.trim().replace(/^@/, "")}`);
+    if (themeId) enrichedTags.push(`theme:${themeId}`);
 
     try {
       const result = await createPool.mutateAsync({
@@ -371,6 +376,50 @@ const CreatePool = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Color theme — Partiful pattern. The pool is a "designed object."
+                    Picker shows live gradient swatches so hosts feel the vibe. */}
+                <div>
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <Palette size={10} className="text-primary" strokeWidth={2.5} />
+                    Color theme
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {POOL_THEMES.map((t) => {
+                      const active = themeId === t.id;
+                      return (
+                        <motion.button
+                          key={t.id}
+                          whileTap={{ scale: 0.94 }}
+                          onClick={() => setThemeId(t.id)}
+                          className="aspect-square rounded-2xl relative overflow-hidden border transition-all"
+                          style={{
+                            backgroundImage: t.gradient,
+                            borderColor: active ? t.accent : "rgba(255,255,255,0.08)",
+                            boxShadow: active ? `0 0 18px ${t.glow}` : undefined,
+                          }}
+                          title={t.label}
+                        >
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-2xl leading-none" style={{ color: t.accent }}>{t.emoji}</span>
+                            <span className="text-[8px] font-mono uppercase tracking-wider mt-1.5" style={{ color: t.foreground }}>
+                              {t.label.split(" ")[0]}
+                            </span>
+                          </div>
+                          {active && (
+                            <div
+                              className="absolute top-1 right-1 w-3 h-3 rounded-full"
+                              style={{ background: t.accent, boxShadow: `0 0 8px ${t.glow}` }}
+                            />
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground mt-2 leading-relaxed">
+                    {themeFor(themeId)?.vibe}
+                  </p>
+                </div>
               </motion.div>
             )}
 
@@ -527,12 +576,32 @@ const CreatePool = () => {
                 </h2>
                 <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider mt-2">review your pool</p>
 
-                <div className="card-stage mt-6 p-5 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+                <div
+                  className="card-stage mt-6 p-5 relative overflow-hidden"
+                  style={{
+                    backgroundImage: themeFor(themeId)?.gradient,
+                    borderColor: (themeFor(themeId)?.accent || "") + "40",
+                    boxShadow: `0 0 0 1px ${themeFor(themeId)?.accent}22, 0 18px 50px -12px ${themeFor(themeId)?.glow}`,
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(120% 80% at 50% -20%, ${themeFor(themeId)?.accent}22 0%, transparent 60%)`,
+                    }}
+                  />
                   <div className="relative">
-                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{CATEGORIES.find(c => c.id === category)?.label}</div>
-                    <h3 className="font-display font-bold text-2xl mt-1">{title}</h3>
-                    {description && <p className="text-sm text-foreground/80 mt-2">{description}</p>}
+                    <div
+                      className="text-[10px] font-mono uppercase tracking-[0.15em] inline-flex items-center gap-1"
+                      style={{ color: themeFor(themeId)?.accent }}
+                    >
+                      <span>{themeFor(themeId)?.emoji}</span>
+                      {CATEGORIES.find(c => c.id === category)?.label}
+                    </div>
+                    <h3 className="font-display font-bold text-2xl mt-1" style={{ color: themeFor(themeId)?.foreground }}>{title}</h3>
+                    {description && (
+                      <p className="text-sm mt-2" style={{ color: (themeFor(themeId)?.foreground || "") + "cc" }}>{description}</p>
+                    )}
 
                     <div className="divider-dashed my-4" />
 
