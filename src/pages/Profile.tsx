@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, MessageCircle, Star, MapPin, Trophy, Zap } from "lucide-react";
+import { ArrowLeft, Settings, MessageCircle, Star, MapPin, Trophy } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser, useFollow, useUnfollow } from "@/hooks/useUsers";
 import { usePools } from "@/hooks/usePools";
@@ -10,6 +10,8 @@ import { useCreateConversation } from "@/hooks/useMessages";
 import { PoolCard } from "@/components/PoolCard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileFrame } from "@/components/layout/MobileFrame";
+import { TierBadge } from "@/components/TierBadge";
+import { tierFor, getLifetimeXP, ACHIEVEMENTS, getEarnedAchievements } from "@/lib/tiers";
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -53,18 +55,13 @@ const Profile = () => {
     navigate(`/messages/${result.id}`);
   };
 
-  // Calculate tier based on karma
+  // City-scoped tier — replaces legacy Bronze/Silver/Gold with playbook tiers.
+  // For "me" we use lifetime XP from localStorage (engagement engine);
+  // for other users we fall back to their karma (server source of truth).
   const karma = displayUser.karma || 0;
-  let tier = "BRONZE";
-  let tierClass = "tier-bronze";
-  let nextTier = "SILVER";
-  let nextThreshold = 500;
-  let prevThreshold = 0;
-  if (karma >= 5000) { tier = "DIAMOND"; tierClass = "tier-diamond"; nextTier = "MAX"; nextThreshold = 5000; prevThreshold = 5000; }
-  else if (karma >= 2000) { tier = "PLATINUM"; tierClass = "tier-platinum"; nextTier = "DIAMOND"; nextThreshold = 5000; prevThreshold = 2000; }
-  else if (karma >= 1000) { tier = "GOLD"; tierClass = "tier-gold"; nextTier = "PLATINUM"; nextThreshold = 2000; prevThreshold = 1000; }
-  else if (karma >= 500) { tier = "SILVER"; tierClass = "tier-silver"; nextTier = "GOLD"; nextThreshold = 1000; prevThreshold = 500; }
-  const tierProgress = nextThreshold > prevThreshold ? Math.round(((karma - prevThreshold) / (nextThreshold - prevThreshold)) * 100) : 100;
+  const totalXP = isMe ? Math.max(karma, getLifetimeXP()) : karma;
+  const myTier = tierFor(totalXP);
+  const earnedAchievements = isMe ? getEarnedAchievements() : [];
 
   return (
     <MobileFrame>
@@ -125,11 +122,14 @@ const Profile = () => {
                   <h2 className="font-display font-bold text-2xl truncate">{displayUser.name}</h2>
                 </div>
                 <p className="text-[11px] font-mono text-muted-foreground">@{displayUser.username}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className={`tag tag-lime ${tierClass}`}>
-                    <Trophy size={10} strokeWidth={3} />
-                    {tier}
-                  </div>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full glass border border-white/10 text-[10px] font-mono uppercase tracking-wider font-bold ${myTier.color}`}
+                    style={{ boxShadow: `0 0 12px ${myTier.glow}` }}
+                  >
+                    <span>{myTier.emoji}</span>
+                    {displayUser.city ? myTier.cityLabel(displayUser.city) : myTier.label}
+                  </span>
                   <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                     <MapPin size={10} />
                     {displayUser.city}
@@ -141,21 +141,17 @@ const Profile = () => {
             {displayUser.bio && (
               <p className="text-sm text-foreground/80 mt-4 leading-relaxed">{displayUser.bio}</p>
             )}
-
-            {/* XP / tier bar */}
-            <div className="mt-5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <Zap size={11} className="text-primary" strokeWidth={3} />
-                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{karma} XP</span>
-                </div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">→ {nextTier}</span>
-              </div>
-              <div className="xp-bar">
-                <div className="xp-bar-fill" style={{ width: `${tierProgress}%` }} />
-              </div>
-            </div>
           </div>
+        </motion.div>
+
+        {/* Tier badge — full city-scoped identity card (Strava clubs pattern) */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="px-5 mt-3"
+        >
+          <TierBadge xp={totalXP} city={displayUser.city} />
         </motion.div>
 
         {/* Stat grid */}
@@ -227,27 +223,53 @@ const Profile = () => {
           )}
         </motion.div>
 
-        {/* Achievements / badges */}
-        {displayUser.badges && displayUser.badges.length > 0 && (
+        {/* Achievement gallery — Strava badge wall pattern.
+            Shows locked + unlocked so users see what's possible (goal-gradient). */}
+        {isMe && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
             className="mt-6"
           >
-            <div className="px-5 mb-3">
-              <h3 className="font-display font-bold text-base">Achievements</h3>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">unlocked badges</p>
-            </div>
-            <div className="overflow-x-auto px-5 scrollbar-hide">
-              <div className="flex gap-2 pb-1">
-                {displayUser.badges.map((b: any, i: number) => (
-                  <div key={i} className="card-stage px-4 py-2.5 shrink-0 flex items-center gap-2">
-                    <Trophy size={14} className="text-primary" strokeWidth={2.5} />
-                    <span className="font-display font-bold text-xs whitespace-nowrap">{b.label}</span>
-                  </div>
-                ))}
+            <div className="px-5 mb-3 flex items-end justify-between">
+              <div>
+                <h3 className="font-display font-bold text-base">Trophy case</h3>
+                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
+                  <span className="text-primary num">{earnedAchievements.length}</span>
+                  <span> / </span>
+                  <span className="num">{ACHIEVEMENTS.length}</span>
+                  <span> unlocked</span>
+                </p>
               </div>
+              <Trophy size={14} className="text-primary" strokeWidth={2.5} />
+            </div>
+            <div className="px-5 grid grid-cols-4 gap-2">
+              {ACHIEVEMENTS.map((a, i) => {
+                const earned = earnedAchievements.includes(a.id);
+                return (
+                  <motion.div
+                    key={a.id}
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.27 + i * 0.04 }}
+                    className={`aspect-square rounded-2xl border flex flex-col items-center justify-center text-center px-1 ${
+                      earned
+                        ? "bg-primary/10 border-primary/40"
+                        : "bg-white/[0.02] border-white/5"
+                    }`}
+                    style={earned ? { boxShadow: "0 0 18px hsla(73,100%,50%,0.25)" } : undefined}
+                    title={a.description}
+                  >
+                    <div className={`text-2xl ${earned ? "text-primary" : "text-foreground/20"}`}>
+                      {a.emoji}
+                    </div>
+                    <div className={`text-[8px] font-mono uppercase tracking-wider mt-1 leading-tight ${earned ? "text-foreground/80" : "text-foreground/30"}`}>
+                      {a.label}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}

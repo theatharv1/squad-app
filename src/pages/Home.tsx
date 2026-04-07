@@ -15,6 +15,8 @@ import { StreakBadge } from "@/components/StreakBadge";
 import { ActivityTicker } from "@/components/ActivityTicker";
 import { TonightVibe } from "@/components/TonightVibe";
 import { WeeklyRitual } from "@/components/WeeklyRitual";
+import { JoinTicker } from "@/components/JoinTicker";
+import { EndingTonight } from "@/components/EndingTonight";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trackOpen, getTimeContext, getXPToday, DAILY_XP_GOAL } from "@/lib/engagement";
 
@@ -260,6 +262,11 @@ const Home = () => {
           </div>
         </motion.div>
 
+        {/* Ending tonight rail — highest converting surface (Resy/Dice pattern) */}
+        <div className="mt-7">
+          <EndingTonight pools={allPools} city={city} />
+        </div>
+
         {/* Tonight section */}
         {todayPools.length > 0 && (
           <motion.div
@@ -350,6 +357,9 @@ const Home = () => {
         </div>
 
         <BottomNav />
+
+        {/* Live join ticker — Eventbrite/Resy social proof toast */}
+        <JoinTicker pools={allPools} />
       </div>
     </MobileFrame>
   );

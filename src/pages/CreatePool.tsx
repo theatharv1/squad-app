@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, ArrowRight, Calendar, MapPin, Users, Trophy } from "lucide-react";
+import { ArrowLeft, X, ArrowRight, Calendar, MapPin, Users, Trophy, Sparkles, Shirt } from "lucide-react";
 import { CATEGORIES, CITIES } from "@/constants";
 import { getCity } from "@/lib/storage";
 import { useCreatePool } from "@/hooks/usePools";
 import { MobileFrame } from "@/components/layout/MobileFrame";
+import { addXP } from "@/lib/engagement";
+import { earnAchievement } from "@/lib/tiers";
 import { toast } from "sonner";
 
 const TIMES = Array.from({ length: 37 }, (_, i) => {
@@ -19,8 +21,66 @@ const TIMES = Array.from({ length: 37 }, (_, i) => {
 const SKILL_LEVELS = ["Beginners OK", "Intermediate", "Advanced Only"];
 const TAG_OPTIONS = ["Women Welcome", "Beginners OK", "Competitive", "Chill vibes", "Bring friends", "Solo friendly"];
 const DATE_OPTIONS = ["Today", "Tomorrow", "This Friday", "Saturday", "Sunday", "Next Week"];
+// Dress code chips — Hosted Vibe pattern from playbook section 10.
+// Tap-to-add, NOT a text field, so creation stays under 90 sec.
+const DRESS_CODE_OPTIONS = [
+  "Casual",
+  "Sportswear",
+  "Smart casual",
+  "Streetwear",
+  "Cosy fits",
+  "All black",
+  "Ethnic",
+  "Whatever fits",
+];
 
 const STEP_LABELS = ["Vibe", "Details", "When · Where", "Crew", "Confirm"];
+
+// Vibe templates — pre-built fills indexed by category. Tap once, ship in <60s.
+// Inspired by Partiful + Posh "vibe-led discovery" — the host doesn't have to
+// be a copywriter; the format does the hosting.
+type VibeTemplate = {
+  id: string;
+  emoji: string;
+  title: string;
+  description: string;
+  tags: string[];
+  spots: number;
+  dressCode?: string;
+};
+
+const VIBE_TEMPLATES: Record<string, VibeTemplate[]> = {
+  football: [
+    { id: "ft1", emoji: "⚽", title: "Sunday morning 5-a-side", description: "Casual kickabout, all levels welcome. Bring water + a smile.", tags: ["Beginners OK", "Chill vibes"], spots: 10, dressCode: "Sportswear" },
+    { id: "ft2", emoji: "🔥", title: "Friday night turf session", description: "Competitive 7-a-side after work. Bring your A-game.", tags: ["Competitive"], spots: 14, dressCode: "Sportswear" },
+  ],
+  cricket: [
+    { id: "cr1", emoji: "🏏", title: "Weekend gully cricket", description: "Tape ball, no helmets, max fun. Pads optional, vibes mandatory.", tags: ["Beginners OK", "Chill vibes"], spots: 12, dressCode: "Casual" },
+  ],
+  badminton: [
+    { id: "bd1", emoji: "🏸", title: "Doubles night at the courts", description: "Booked the courts for an hour. Looking for 3 more for doubles.", tags: ["Intermediate"], spots: 4, dressCode: "Sportswear" },
+  ],
+  travel: [
+    { id: "tv1", emoji: "🌅", title: "Sunset chai walk", description: "Walking the promenade, ending at the chai stall. Slow pace, deep talks.", tags: ["Solo friendly", "Chill vibes"], spots: 6, dressCode: "Casual" },
+    { id: "tv2", emoji: "🚐", title: "Day trip — leaving 7am", description: "Roadtrip to the closest hill station. Petrol split, snacks shared.", tags: ["Bring friends"], spots: 5, dressCode: "Cosy fits" },
+  ],
+  party: [
+    { id: "pt1", emoji: "🎶", title: "House party at mine", description: "Speakers, snacks, BYO drinks. Plus-ones cool.", tags: ["Bring friends", "Chill vibes"], spots: 12, dressCode: "Streetwear" },
+    { id: "pt2", emoji: "🪩", title: "Club night — pre-game first", description: "Pre-gaming at 9, hitting the club at 11. Need 4 more.", tags: ["Bring friends"], spots: 8, dressCode: "All black" },
+  ],
+  hiking: [
+    { id: "hk1", emoji: "🏔️", title: "Sunrise trek + breakfast", description: "Easy 2-hour trek, breakfast at the top. Alarms set for 5am.", tags: ["Beginners OK"], spots: 8, dressCode: "Sportswear" },
+  ],
+  running: [
+    { id: "rn1", emoji: "🏃", title: "Easy 5k along the lake", description: "No pace pressure. Coffee after.", tags: ["Beginners OK", "Solo friendly"], spots: 6, dressCode: "Sportswear" },
+  ],
+  cycling: [
+    { id: "cy1", emoji: "🚴", title: "Sunday morning ride", description: "20km loop, café stop midway. Helmets non-negotiable.", tags: ["Intermediate"], spots: 8, dressCode: "Sportswear" },
+  ],
+  gaming: [
+    { id: "gm1", emoji: "🎮", title: "Tournament night at the café", description: "Pulling up to the gaming café for a tourney. 4-team bracket.", tags: ["Competitive"], spots: 8, dressCode: "Casual" },
+  ],
+};
 
 const Pill = ({ active, onClick, children }: any) => (
   <button
@@ -52,9 +112,21 @@ const CreatePool = () => {
   const [spots, setSpots] = useState(6);
   const [isFree, setIsFree] = useState(true);
   const [cost, setCost] = useState("");
+  const [dressCode, setDressCode] = useState("");
+  const [coHost, setCoHost] = useState("");
   const [publishing, setPublishing] = useState(false);
 
   const toggleTag = (t: string) => setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+  // Apply a vibe template — pre-fills everything in one tap. Partiful pattern.
+  const applyTemplate = (tpl: VibeTemplate) => {
+    setTitle(tpl.title);
+    setDescription(tpl.description);
+    setTags(tpl.tags);
+    setSpots(tpl.spots);
+    if (tpl.dressCode) setDressCode(tpl.dressCode);
+    toast.success("Vibe loaded · tap Next");
+  };
 
   const canProceed = [
     !!category,
@@ -85,15 +157,23 @@ const CreatePool = () => {
       scheduledDate.setHours(h, m, 0, 0);
     }
 
+    // Encode dress code + co-host into tags (back-compat with current backend
+    // schema). Future server work can split these into proper columns.
+    const enrichedTags = [...tags];
+    if (dressCode) enrichedTags.push(`fit:${dressCode}`);
+    if (coHost.trim()) enrichedTags.push(`cohost:${coHost.trim().replace(/^@/, "")}`);
+
     try {
       const result = await createPool.mutateAsync({
         title, category, emoji: cat?.label || "Activity",
-        city, area, venue, description, tags, skillLevel,
+        city, area, venue, description, tags: enrichedTags, skillLevel,
         scheduledTime: scheduledDate.toISOString(),
         spotsTotal: spots,
         costPerHead: isFree ? 0 : parseInt(cost) || 0,
       });
-      toast.success("Pool raised");
+      addXP(50);
+      const firstHost = earnAchievement("first_host");
+      toast.success(firstHost ? "Pool raised · First Host unlocked · +50 XP" : "Pool raised · +50 XP");
       navigate(`/pool/${result.id}`);
     } catch (err: any) {
       toast.error(err.message || "Failed to create pool");
@@ -182,6 +262,50 @@ const CreatePool = () => {
                     </motion.button>
                   ))}
                 </div>
+
+                {/* Vibe templates — Partiful "format does the hosting" pattern.
+                    One tap pre-fills title, desc, tags, spots, dress code. */}
+                {category && VIBE_TEMPLATES[category]?.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="mt-6"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles size={12} className="text-pink-400" strokeWidth={2.5} />
+                      <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-pink-400">// Quick-start vibe</div>
+                    </div>
+                    <div className="space-y-2">
+                      {VIBE_TEMPLATES[category].map((tpl, i) => (
+                        <motion.button
+                          key={tpl.id}
+                          initial={{ opacity: 0, x: 16 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.12 + i * 0.05 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => applyTemplate(tpl)}
+                          className="card-stage w-full p-4 text-left flex items-start gap-3"
+                        >
+                          <div className="text-2xl shrink-0 leading-none">{tpl.emoji}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-display font-bold text-sm leading-tight">{tpl.title}</div>
+                            <div className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{tpl.description}</div>
+                            <div className="flex gap-1.5 mt-2">
+                              {tpl.tags.slice(0, 2).map(t => (
+                                <span key={t} className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.04] border border-white/10 text-foreground/60">{t}</span>
+                              ))}
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary num">
+                                {tpl.spots} spots
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-[10px] font-mono uppercase tracking-wider text-pink-400 shrink-0 self-center">tap</div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             )}
 
@@ -231,6 +355,19 @@ const CreatePool = () => {
                   <div className="flex flex-wrap gap-2">
                     {TAG_OPTIONS.map(t => (
                       <Pill key={t} active={tags.includes(t)} onClick={() => toggleTag(t)}>{t}</Pill>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dress code — Hosted Vibe pattern. Tap-to-add chip, not text. */}
+                <div>
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <Shirt size={10} className="text-primary" strokeWidth={2.5} />
+                    Dress code (optional)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {DRESS_CODE_OPTIONS.map(d => (
+                      <Pill key={d} active={dressCode === d} onClick={() => setDressCode(dressCode === d ? "" : d)}>{d}</Pill>
                     ))}
                   </div>
                 </div>
@@ -354,6 +491,25 @@ const CreatePool = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Co-host invite — playbook: doubles trust + reach via co-host's social graph */}
+                <div>
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Tag your accomplice (optional)</label>
+                  <div className="card-stage p-4 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                      <Users size={14} className="text-primary" strokeWidth={2.5} />
+                    </div>
+                    <input
+                      value={coHost}
+                      onChange={e => setCoHost(e.target.value)}
+                      className="flex-1 bg-transparent outline-none text-sm font-mono placeholder:text-foreground/30"
+                      placeholder="@username"
+                    />
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground mt-2 leading-relaxed">
+                    Co-hosts double your reach · their friends see your pool too
+                  </p>
+                </div>
               </motion.div>
             )}
 
@@ -399,6 +555,18 @@ const CreatePool = () => {
                         <div className="flex items-center gap-3 text-sm">
                           <Trophy size={14} className="text-primary shrink-0" strokeWidth={2.5} />
                           <span>{skillLevel}</span>
+                        </div>
+                      )}
+                      {dressCode && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Shirt size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                          <span>{dressCode}</span>
+                        </div>
+                      )}
+                      {coHost && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Users size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                          <span>Co-host: <span className="text-primary font-mono">{coHost.startsWith("@") ? coHost : `@${coHost}`}</span></span>
                         </div>
                       )}
                     </div>

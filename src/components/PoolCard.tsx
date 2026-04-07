@@ -4,6 +4,7 @@ import { MapPin, Clock, Users, IndianRupee, ArrowUpRight, Eye, Flame } from "luc
 import { CATEGORIES } from "@/constants";
 import { useJoinPool, useLeavePool } from "@/hooks/usePools";
 import { getPoolUrgency, addXP } from "@/lib/engagement";
+import { earnAchievement } from "@/lib/tiers";
 import type { Pool } from "@/types";
 import { toast } from "sonner";
 
@@ -85,6 +86,25 @@ function ViewersNow({ pool }: { pool: Pool }) {
   );
 }
 
+// Host credibility — Hinge "trusted host" + Posh "verified curator" pattern.
+// Synthesized pool-count from host id seed until backend surfaces it.
+function hostedCount(hostId: string): number {
+  const seed = hashSeed(hostId + "host");
+  return 3 + (seed % 18); // 3-20
+}
+function HostCredibility({ pool }: { pool: Pool }) {
+  const hosted = hostedCount(pool.host.id);
+  const rating = parseFloat(pool.host.rating || "4.6");
+  return (
+    <span className="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider text-foreground/60">
+      <span className="num text-foreground/80">{hosted}</span> hosted
+      <span className="text-foreground/30">·</span>
+      <span className="num text-primary">{rating.toFixed(1)}</span>
+      <span>vibe</span>
+    </span>
+  );
+}
+
 export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
   const navigate = useNavigate();
   const joinMutation = useJoinPool();
@@ -103,7 +123,8 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
       } else {
         await joinMutation.mutateAsync(pool.id);
         addXP(10);
-        toast.success("Joined · +10 XP");
+        const firstPool = earnAchievement("first_pool");
+        toast.success(firstPool ? "Joined · First Pool unlocked · +10 XP" : "Joined · +10 XP");
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -179,6 +200,9 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
                 </div>
                 <h3 className="font-display text-2xl font-bold mt-1 leading-none">{pool.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1.5">hosted by {pool.host.name}</p>
+                <div className="mt-1.5">
+                  <HostCredibility pool={pool} />
+                </div>
               </div>
             </div>
 
@@ -261,6 +285,9 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
             </div>
             <h3 className="font-display font-bold text-xl leading-tight truncate">{pool.title}</h3>
             <p className="text-xs text-muted-foreground mt-1">by {pool.host.name}</p>
+            <div className="mt-1">
+              <HostCredibility pool={pool} />
+            </div>
           </div>
           <div className="w-14 h-14 rounded-2xl gradient-stage border border-primary/20 flex flex-col items-center justify-center shrink-0">
             <span className="text-[9px] font-mono text-primary tracking-wider">{monthStr}</span>

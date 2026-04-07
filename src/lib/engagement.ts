@@ -120,6 +120,13 @@ export function addXP(amount: number) {
   const current = getXPToday();
   localStorage.setItem(KEYS.XP_TODAY, String(current + amount));
   localStorage.setItem(KEYS.XP_DATE, todayKey());
+  // Also accumulate lifetime XP for tier progression. Lazy import to
+  // avoid a circular dep: tiers.ts uses raw localStorage, so we mirror that.
+  try {
+    const lifetimeKey = "squad_lifetime_xp";
+    const lifetime = parseInt(localStorage.getItem(lifetimeKey) || "0", 10);
+    localStorage.setItem(lifetimeKey, String(lifetime + amount));
+  } catch {}
 }
 
 export const DAILY_XP_GOAL = 100;
