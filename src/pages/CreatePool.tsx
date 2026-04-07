@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, X, ArrowRight, Calendar, MapPin, Users, Trophy } from "lucide-react";
 import { CATEGORIES, CITIES } from "@/constants";
 import { getCity } from "@/lib/storage";
 import { useCreatePool } from "@/hooks/usePools";
-import { useAuth } from "@/contexts/AuthContext";
 import { MobileFrame } from "@/components/layout/MobileFrame";
 import { toast } from "sonner";
 
@@ -21,15 +20,23 @@ const SKILL_LEVELS = ["Beginners OK", "Intermediate", "Advanced Only"];
 const TAG_OPTIONS = ["Women Welcome", "Beginners OK", "Competitive", "Chill vibes", "Bring friends", "Solo friendly"];
 const DATE_OPTIONS = ["Today", "Tomorrow", "This Friday", "Saturday", "Sunday", "Next Week"];
 
-const springTransition = {
-  type: "spring" as const,
-  stiffness: 300,
-  damping: 24,
-};
+const STEP_LABELS = ["Vibe", "Details", "When · Where", "Crew", "Confirm"];
+
+const Pill = ({ active, onClick, children }: any) => (
+  <button
+    onClick={onClick}
+    className={`shrink-0 px-4 py-2 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all ${
+      active
+        ? "bg-primary text-primary-foreground"
+        : "bg-white/[0.04] border border-white/10 text-foreground/70"
+    }`}
+  >
+    {children}
+  </button>
+);
 
 const CreatePool = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const createPool = useCreatePool();
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState("");
@@ -80,13 +87,13 @@ const CreatePool = () => {
 
     try {
       const result = await createPool.mutateAsync({
-        title, category, emoji: cat?.emoji || "🎯",
+        title, category, emoji: cat?.label || "Activity",
         city, area, venue, description, tags, skillLevel,
         scheduledTime: scheduledDate.toISOString(),
         spotsTotal: spots,
         costPerHead: isFree ? 0 : parseInt(cost) || 0,
       });
-      toast.success("Pool raised!");
+      toast.success("Pool raised");
       navigate(`/pool/${result.id}`);
     } catch (err: any) {
       toast.error(err.message || "Failed to create pool");
@@ -96,42 +103,82 @@ const CreatePool = () => {
 
   return (
     <MobileFrame>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-3">
+        <div className="sticky top-0 z-30 glass-strong px-5 pt-5 pb-4">
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {step > 0 && (
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setStep(s => s - 1)}>
-                  <ArrowLeft size={20} />
+              {step > 0 ? (
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => setStep(s => s - 1)}
+                  className="w-10 h-10 rounded-full glass flex items-center justify-center"
+                >
+                  <ArrowLeft size={18} strokeWidth={2.5} />
                 </motion.button>
+              ) : (
+                <div className="w-10" />
               )}
               <div>
-                <div className="h-1.5 w-32 bg-secondary rounded-full overflow-hidden">
-                  <motion.div className="h-full gradient-primary rounded-full" animate={{ width: `${((step + 1) / 5) * 100}%` }} transition={springTransition} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Step {step + 1} of 5</p>
+                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">Raise a pool · {step + 1}/5</div>
+                <div className="font-display font-bold text-xl mt-0.5">{STEP_LABELS[step]}</div>
               </div>
             </div>
-            <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}><X size={20} /></motion.button>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <X size={18} strokeWidth={2.5} />
+            </motion.button>
           </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-3" />
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="xp-bar">
+              <motion.div
+                className="xp-bar-fill"
+                animate={{ width: `${((step + 1) / 5) * 100}%` }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Steps */}
-        <div className="flex-1 px-4 pt-6 pb-24 overflow-y-auto">
+        <div className="flex-1 px-5 pt-6 pb-32 overflow-y-auto">
           <AnimatePresence mode="wait">
             {step === 0 && (
-              <motion.div key="s0"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0, transition: springTransition }} exit={{ opacity: 0, x: -20 }}>
-                <h2 className="font-heading text-xl font-bold mb-4">What are you raising?</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {CATEGORIES.map(cat => (
-                    <motion.button key={cat.id} whileTap={{ scale: 0.95 }} whileHover={{ scale: 1.02, y: -2 }}
+              <motion.div
+                key="s0"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.3 }}
+              >
+                <h2 className="text-display">
+                  Pick the <br />
+                  <span className="text-gradient-cyan-magenta">vibe</span>
+                </h2>
+                <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider mt-2">what's the activity</p>
+
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  {CATEGORIES.map((cat, i) => (
+                    <motion.button
+                      key={cat.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => setCategory(cat.id)}
-                      className={`card-premium p-3 text-center transition-all ${category === cat.id ? "ring-2 ring-primary shadow-glow" : ""}`}>
-                      <span className="text-2xl">{cat.emoji}</span>
-                      <p className="text-xs mt-1">{cat.label}</p>
+                      className={`bento-item h-24 text-left transition-all ${
+                        category === cat.id
+                          ? "border-primary/50 bg-primary/5"
+                          : ""
+                      }`}
+                    >
+                      <div className="text-[9px] font-mono uppercase tracking-[0.15em] text-primary">Sport</div>
+                      <div className="font-display font-bold text-lg leading-tight mt-1">{cat.label}</div>
                     </motion.button>
                   ))}
                 </div>
@@ -139,39 +186,51 @@ const CreatePool = () => {
             )}
 
             {step === 1 && (
-              <motion.div key="s1"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0, transition: springTransition }} exit={{ opacity: 0, x: -20 }}
-                className="space-y-4">
-                <h2 className="font-heading text-xl font-bold">Pool Details</h2>
+              <motion.div
+                key="s1"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-5"
+              >
+                <h2 className="text-display">
+                  Tell us <br />
+                  <span className="text-gradient-cyan-magenta">the deets</span>
+                </h2>
+
                 <div>
-                  <label className="text-sm text-muted-foreground">Title</label>
-                  <input value={title} onChange={e => setTitle(e.target.value)}
-                    className="input-premium w-full mt-1"
-                    placeholder="e.g., Anyone up for football tonight?" />
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Title</label>
+                  <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="input-stage"
+                    placeholder="Anyone up for football tonight?"
+                  />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Description</label>
-                  <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
-                    className="input-premium w-full mt-1 resize-none"
-                    placeholder="Tell people what to expect..." />
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    rows={3}
+                    className="input-stage resize-none"
+                    placeholder="Tell people what to expect..."
+                  />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Skill Level</label>
-                  <div className="flex gap-2 mt-1">
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Skill level</label>
+                  <div className="flex gap-2 flex-wrap">
                     {SKILL_LEVELS.map(s => (
-                      <button key={s} onClick={() => setSkillLevel(s)}
-                        className={`pill ${skillLevel === s ? "pill-active" : "pill-inactive"}`}
-                      >{s}</button>
+                      <Pill key={s} active={skillLevel === s} onClick={() => setSkillLevel(s)}>{s}</Pill>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Tags</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Tags</label>
+                  <div className="flex flex-wrap gap-2">
                     {TAG_OPTIONS.map(t => (
-                      <button key={t} onClick={() => toggleTag(t)}
-                        className={`pill ${tags.includes(t) ? "pill-active" : "pill-inactive"}`}
-                      >{t}</button>
+                      <Pill key={t} active={tags.includes(t)} onClick={() => toggleTag(t)}>{t}</Pill>
                     ))}
                   </div>
                 </div>
@@ -179,84 +238,119 @@ const CreatePool = () => {
             )}
 
             {step === 2 && (
-              <motion.div key="s2"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0, transition: springTransition }} exit={{ opacity: 0, x: -20 }}
-                className="space-y-4">
-                <h2 className="font-heading text-xl font-bold">When & Where</h2>
+              <motion.div
+                key="s2"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-5"
+              >
+                <h2 className="text-display">
+                  When <span className="text-gradient-cyan-magenta">&</span> <br />
+                  where
+                </h2>
+
                 <div>
-                  <label className="text-sm text-muted-foreground">Date</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Date</label>
+                  <div className="flex flex-wrap gap-2">
                     {DATE_OPTIONS.map(d => (
-                      <button key={d} onClick={() => setDate(d)}
-                        className={`pill ${date === d ? "pill-active" : "pill-inactive"}`}
-                      >{d}</button>
+                      <Pill key={d} active={date === d} onClick={() => setDate(d)}>{d}</Pill>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Time</label>
-                  <div className="flex gap-2 mt-1 overflow-x-auto scrollbar-hide pb-1">
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Time</label>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                     {TIMES.map(t => (
-                      <button key={t} onClick={() => setTime(t)}
-                        className={`pill whitespace-nowrap ${time === t ? "pill-active" : "pill-inactive"}`}
-                      >{t}</button>
+                      <Pill key={t} active={time === t} onClick={() => setTime(t)}>{t}</Pill>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">City</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">City</label>
+                  <div className="flex flex-wrap gap-2">
                     {CITIES.map(c => (
-                      <button key={c} onClick={() => setCity(c)}
-                        className={`pill ${city === c ? "pill-active" : "pill-inactive"}`}
-                      >{c}</button>
+                      <Pill key={c} active={city === c} onClick={() => setCity(c)}>{c}</Pill>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Area / Neighbourhood</label>
-                  <input value={area} onChange={e => setArea(e.target.value)}
-                    className="input-premium w-full mt-1"
-                    placeholder="e.g., Malviya Nagar" />
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Area / neighbourhood</label>
+                  <input
+                    value={area}
+                    onChange={e => setArea(e.target.value)}
+                    className="input-stage"
+                    placeholder="e.g., Malviya Nagar"
+                  />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Venue (optional)</label>
-                  <input value={venue} onChange={e => setVenue(e.target.value)}
-                    className="input-premium w-full mt-1"
-                    placeholder="e.g., Malviya Nagar Turf" />
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Venue (optional)</label>
+                  <input
+                    value={venue}
+                    onChange={e => setVenue(e.target.value)}
+                    className="input-stage"
+                    placeholder="e.g., Malviya Nagar Turf"
+                  />
                 </div>
               </motion.div>
             )}
 
             {step === 3 && (
-              <motion.div key="s3"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0, transition: springTransition }} exit={{ opacity: 0, x: -20 }}
-                className="space-y-4">
-                <h2 className="font-heading text-xl font-bold">Spots & Cost</h2>
+              <motion.div
+                key="s3"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <h2 className="text-display">
+                  Build the <br />
+                  <span className="text-gradient-cyan-magenta">crew</span>
+                </h2>
+
                 <div>
-                  <label className="text-sm text-muted-foreground">Total Spots</label>
-                  <div className="flex items-center gap-4 mt-2">
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSpots(s => Math.max(2, s - 1))}
-                      className="w-10 h-10 card-premium rounded-full text-lg flex items-center justify-center">-</motion.button>
-                    <span className="text-2xl font-bold w-12 text-center gradient-text">{spots}</span>
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSpots(s => Math.min(50, s + 1))}
-                      className="w-10 h-10 card-premium rounded-full text-lg flex items-center justify-center">+</motion.button>
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-3 block">Total spots</label>
+                  <div className="card-stage p-6 flex items-center justify-between">
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setSpots(s => Math.max(2, s - 1))}
+                      className="w-12 h-12 rounded-full bg-white/[0.04] border border-white/10 text-2xl font-display font-bold flex items-center justify-center"
+                    >
+                      −
+                    </motion.button>
+                    <div className="text-center">
+                      <div className="font-display font-bold text-6xl num leading-none text-gradient-cyan-magenta">{spots}</div>
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-2">players</div>
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setSpots(s => Math.min(50, s + 1))}
+                      className="w-12 h-12 rounded-full bg-primary text-primary-foreground text-2xl font-display font-bold flex items-center justify-center"
+                      style={{ boxShadow: "0 0 20px hsla(73, 100%, 50%, 0.4)" }}
+                    >
+                      +
+                    </motion.button>
                   </div>
                 </div>
+
                 <div>
-                  <label className="text-sm text-muted-foreground">Cost</label>
-                  <div className="flex gap-2 mt-1">
-                    <button onClick={() => setIsFree(true)}
-                      className={`pill ${isFree ? "pill-active" : "pill-inactive"} px-4 py-2`}>Free</button>
-                    <button onClick={() => setIsFree(false)}
-                      className={`pill ${!isFree ? "pill-active" : "pill-inactive"} px-4 py-2`}>Paid</button>
+                  <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2 block">Cost</label>
+                  <div className="flex gap-2">
+                    <Pill active={isFree} onClick={() => setIsFree(true)}>Free</Pill>
+                    <Pill active={!isFree} onClick={() => setIsFree(false)}>Paid</Pill>
                   </div>
                   {!isFree && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-muted-foreground">&#8377;</span>
-                      <input type="number" value={cost} onChange={e => setCost(e.target.value)}
-                        className="input-premium w-32"
-                        placeholder="per head" />
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-2xl font-display font-bold text-primary">₹</span>
+                      <input
+                        type="number"
+                        value={cost}
+                        onChange={e => setCost(e.target.value)}
+                        className="input-stage w-32"
+                        placeholder="per head"
+                      />
                     </div>
                   )}
                 </div>
@@ -264,28 +358,61 @@ const CreatePool = () => {
             )}
 
             {step === 4 && (
-              <motion.div key="s4"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0, transition: springTransition }} exit={{ opacity: 0, x: -20 }}>
-                <h2 className="font-heading text-xl font-bold mb-4">Review Your Pool</h2>
-                <div className="card-premium gradient-primary-subtle p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{CATEGORIES.find(c => c.id === category)?.emoji}</span>
-                    <span className="text-sm text-muted-foreground">{CATEGORIES.find(c => c.id === category)?.label}</span>
-                  </div>
-                  <h3 className="font-semibold text-lg">{title}</h3>
-                  {description && <p className="text-sm text-muted-foreground">{description}</p>}
-                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-                  <div className="text-sm space-y-1 text-muted-foreground">
-                    <p>&#128197; {date} at {time}</p>
-                    <p>&#128205; {area}{venue ? ` · ${venue}` : ""}, {city}</p>
-                    <p>&#128101; {spots} spots · {isFree ? "Free" : `₹${cost}/head`}</p>
-                    {skillLevel && <p>&#127919; {skillLevel}</p>}
-                  </div>
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {tags.map(t => <span key={t} className="pill pill-inactive text-xs">{t}</span>)}
+              <motion.div
+                key="s4"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.3 }}
+              >
+                <h2 className="text-display">
+                  Final <br />
+                  <span className="text-gradient-cyan-magenta">check</span>
+                </h2>
+                <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider mt-2">review your pool</p>
+
+                <div className="card-stage mt-6 p-5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+                  <div className="relative">
+                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{CATEGORIES.find(c => c.id === category)?.label}</div>
+                    <h3 className="font-display font-bold text-2xl mt-1">{title}</h3>
+                    {description && <p className="text-sm text-foreground/80 mt-2">{description}</p>}
+
+                    <div className="divider-dashed my-4" />
+
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-3 text-sm">
+                        <Calendar size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                        <span>{date} at {time}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <MapPin size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                        <span>{area}{venue ? ` · ${venue}` : ""}, {city}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <Users size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                        <span className="num">{spots} spots</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-primary font-bold">{isFree ? "Free" : `₹${cost}/head`}</span>
+                      </div>
+                      {skillLevel && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Trophy size={14} className="text-primary shrink-0" strokeWidth={2.5} />
+                          <span>{skillLevel}</span>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {tags.map(t => (
+                          <span key={t} className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] border border-white/10 text-foreground/70">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -293,23 +420,32 @@ const CreatePool = () => {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 p-4 glass-strong">
-          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mb-4" />
+        <div className="sticky bottom-0 px-5 pt-4 pb-5 glass-strong">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           {step < 4 ? (
-            <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(s => s + 1)}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setStep(s => s + 1)}
               disabled={!canProceed[step]}
-              className="btn-primary w-full font-bold py-3.5 rounded-xl disabled:opacity-50">
+              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-display font-bold text-base flex items-center justify-center gap-2 disabled:opacity-40"
+              style={{ boxShadow: canProceed[step] ? "0 0 24px hsla(73, 100%, 50%, 0.4)" : undefined }}
+            >
               Next
+              <ArrowRight size={18} strokeWidth={3} />
             </motion.button>
           ) : (
-            <motion.button whileTap={{ scale: 0.97 }} onClick={handlePublish}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handlePublish}
               disabled={publishing}
-              className="btn-primary w-full font-bold py-3.5 rounded-xl disabled:opacity-50 shadow-glow">
-              {publishing ? "Raising..." : "Raise This Pool 🚀"}
+              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-display font-bold text-base disabled:opacity-50"
+              style={{ boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.5)" }}
+            >
+              {publishing ? "Raising..." : "Raise this pool"}
             </motion.button>
           )}
         </div>
-      </motion.div>
+      </div>
     </MobileFrame>
   );
 };

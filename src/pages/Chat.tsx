@@ -14,7 +14,7 @@ const Chat = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: allConvs = [] } = useConversations();
-  const { data: fetchedMessages = [], refetch } = useMessages(id);
+  const { data: fetchedMessages = [] } = useMessages(id);
   const sendMutation = useSendMessage();
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
@@ -27,13 +27,11 @@ const Chat = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Socket.io for real-time
   useEffect(() => {
     const socket = connectSocket() || getSocket();
     if (!socket || !id) return;
 
     socket.emit("join_conversation", id);
-
     const handler = (data: { conversationId: string; message: Message }) => {
       if (data.conversationId === id && data.message.senderId !== user?.id) {
         setLocalMessages(prev => [...prev, { ...data.message, isMe: false }]);
@@ -47,7 +45,6 @@ const Chat = () => {
     };
   }, [id, user?.id]);
 
-  // Clear local messages when fetched messages update
   useEffect(() => { setLocalMessages([]); }, [fetchedMessages]);
 
   const handleSend = async () => {
@@ -55,7 +52,6 @@ const Chat = () => {
     const msg = text.trim();
     setText("");
 
-    // Optimistic local add
     setLocalMessages(prev => [...prev, {
       id: `local_${Date.now()}`,
       sender: user?.name || "",
@@ -67,7 +63,6 @@ const Chat = () => {
       isSystem: false,
     }]);
 
-    // Also send via socket for real-time
     const socket = getSocket();
     if (socket) {
       socket.emit("send_message", { conversationId: id, text: msg });
@@ -84,43 +79,75 @@ const Chat = () => {
 
   return (
     <MobileFrame>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 z-30 glass-strong px-4 py-3 flex items-center gap-3">
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </motion.button>
-          <img src={conv?.avatar || ""} className="w-8 h-8 rounded-full avatar-ring" />
-          <div className="flex-1">
-            <p className="font-semibold text-sm">{conv?.name || "Chat"}</p>
-            {conv?.isGroup && <p className="text-xs text-muted-foreground">{conv.members} members</p>}
+        <div className="sticky top-0 z-30 glass-strong px-5 py-4">
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </motion.button>
+            <div className="avatar-ring shrink-0">
+              <div className="w-9 h-9 rounded-full bg-card overflow-hidden">
+                {conv?.avatar ? (
+                  <img src={conv.avatar} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-display font-bold text-xs">{conv?.name?.[0] || "?"}</div>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-display font-bold text-sm truncate">{conv?.name || "Chat"}</p>
+              {conv?.isGroup && <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{conv.members} in squad</p>}
+            </div>
+            <button className="w-10 h-10 rounded-full glass flex items-center justify-center">
+              <Info size={16} strokeWidth={2.2} className="text-foreground/70" />
+            </button>
           </div>
-          <button><Info size={20} className="text-muted-foreground" /></button>
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
           {messages.map((msg, i) => {
             if (msg.isSystem) {
               return (
-                <motion.div key={msg.id}
-                  initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                  className="text-center">
-                  <span className="text-xs glass px-3 py-1 rounded-full text-muted-foreground inline-block">{msg.text}</span>
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center"
+                >
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-muted-foreground inline-block">
+                    {msg.text}
+                  </span>
                 </motion.div>
               );
             }
-            const showSender = conv?.isGroup && !msg.isMe && (i === 0 || messages[i-1]?.senderId !== msg.senderId);
+            const showSender = conv?.isGroup && !msg.isMe && (i === 0 || messages[i - 1]?.senderId !== msg.senderId);
             return (
-              <motion.div key={msg.id}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
-                {showSender && <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.sender}</span>}
-                <div className={`max-w-[75%] px-3.5 py-2 text-sm ${msg.isMe ? "gradient-primary text-primary-foreground rounded-2xl rounded-br-md" : "glass rounded-2xl rounded-bl-md"}`}>
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}
+              >
+                {showSender && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-primary mb-1 px-1">{msg.sender}</span>
+                )}
+                <div
+                  className={`max-w-[75%] px-4 py-2.5 text-sm ${
+                    msg.isMe
+                      ? "bg-primary text-primary-foreground rounded-3xl rounded-br-md font-medium"
+                      : "bg-white/[0.06] border border-white/10 rounded-3xl rounded-bl-md text-foreground"
+                  }`}
+                >
                   {msg.text}
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-0.5 px-1">{formatTime(msg.time)}</span>
+                <span className="text-[9px] font-mono text-muted-foreground mt-1 px-2">{formatTime(msg.time)}</span>
               </motion.div>
             );
           })}
@@ -128,19 +155,28 @@ const Chat = () => {
         </div>
 
         {/* Input */}
-        <div className="sticky bottom-0 p-3 glass-strong flex items-center gap-2">
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-          <input value={text} onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSend()}
-            className="input-premium flex-1 rounded-full px-4 py-2.5"
-            placeholder="Type a message..." />
-          <motion.button whileTap={{ scale: 0.9 }} onClick={handleSend}
-            disabled={!text.trim()}
-            className="w-10 h-10 gradient-primary shadow-glow rounded-full flex items-center justify-center disabled:opacity-50">
-            <Send size={16} className="text-primary-foreground" />
-          </motion.button>
+        <div className="sticky bottom-0 px-5 py-3 glass-strong">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <div className="flex items-center gap-2">
+            <input
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSend()}
+              className="flex-1 input-stage py-3 rounded-full"
+              placeholder="Type a message..."
+            />
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleSend}
+              disabled={!text.trim()}
+              className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 shrink-0"
+              style={{ boxShadow: "0 0 20px hsla(73, 100%, 50%, 0.4)" }}
+            >
+              <Send size={16} strokeWidth={3} />
+            </motion.button>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </MobileFrame>
   );
 };

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Settings, MessageCircle, Star, MapPin } from "lucide-react";
+import { ArrowLeft, Settings, MessageCircle, Star, MapPin, Trophy, Zap } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser, useFollow, useUnfollow } from "@/hooks/useUsers";
 import { usePools } from "@/hooks/usePools";
@@ -10,15 +10,6 @@ import { useCreateConversation } from "@/hooks/useMessages";
 import { PoolCard } from "@/components/PoolCard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileFrame } from "@/components/layout/MobileFrame";
-
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
-};
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -39,12 +30,12 @@ const Profile = () => {
 
   if (isLoading || !displayUser) return (
     <MobileFrame>
-      <div className="min-h-screen bg-background p-4 space-y-4">
-        <div className="flex justify-center"><div className="shimmer rounded-full w-20 h-20" /></div>
-        <div className="shimmer rounded-2xl h-6 w-40 mx-auto" />
-        <div className="shimmer rounded-2xl h-4 w-32 mx-auto" />
-        <div className="grid grid-cols-4 gap-2 px-6 mt-4">
-          {[1,2,3,4].map(i => <div key={i} className="shimmer rounded-2xl h-14" />)}
+      <div className="min-h-screen p-5 space-y-4">
+        <div className="card-stage h-48 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" style={{ animation: "shimmer 2s infinite" }} />
+        </div>
+        <div className="card-stage h-32 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" style={{ animation: "shimmer 2s infinite" }} />
         </div>
       </div>
     </MobileFrame>
@@ -62,130 +53,299 @@ const Profile = () => {
     navigate(`/messages/${result.id}`);
   };
 
+  // Calculate tier based on karma
+  const karma = displayUser.karma || 0;
+  let tier = "BRONZE";
+  let tierClass = "tier-bronze";
+  let nextTier = "SILVER";
+  let nextThreshold = 500;
+  let prevThreshold = 0;
+  if (karma >= 5000) { tier = "DIAMOND"; tierClass = "tier-diamond"; nextTier = "MAX"; nextThreshold = 5000; prevThreshold = 5000; }
+  else if (karma >= 2000) { tier = "PLATINUM"; tierClass = "tier-platinum"; nextTier = "DIAMOND"; nextThreshold = 5000; prevThreshold = 2000; }
+  else if (karma >= 1000) { tier = "GOLD"; tierClass = "tier-gold"; nextTier = "PLATINUM"; nextThreshold = 2000; prevThreshold = 1000; }
+  else if (karma >= 500) { tier = "SILVER"; tierClass = "tier-silver"; nextTier = "GOLD"; nextThreshold = 1000; prevThreshold = 500; }
+  const tierProgress = nextThreshold > prevThreshold ? Math.round(((karma - prevThreshold) / (nextThreshold - prevThreshold)) * 100) : 100;
+
   return (
     <MobileFrame>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen pb-28">
         {/* Header */}
-        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-3">
+        <div className="sticky top-0 z-30 glass-strong px-5 pt-5 pb-4">
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           <div className="flex items-center justify-between">
-            {!isMe && <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}><ArrowLeft size={20} /></motion.button>}
-            <h1 className="font-heading text-lg font-bold">{isMe ? "Profile" : ""}</h1>
-            {isMe && <button onClick={() => navigate("/settings")}><Settings size={20} /></button>}
+            {!isMe ? (
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => navigate(-1)}
+                className="w-10 h-10 rounded-full glass flex items-center justify-center"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+              </motion.button>
+            ) : (
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">Player profile</div>
+                <h1 className="font-display font-bold text-xl mt-0.5">@{displayUser.username}</h1>
+              </div>
+            )}
+            {isMe && (
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => navigate("/settings")}
+                className="w-10 h-10 rounded-full glass flex items-center justify-center"
+              >
+                <Settings size={18} strokeWidth={2.2} />
+              </motion.button>
+            )}
           </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-3" />
         </div>
 
-        {/* Avatar & Info */}
-        <div className="flex flex-col items-center mt-4">
-          <img src={displayUser.avatarUrl || ""} className="w-20 h-20 rounded-full object-cover avatar-ring shadow-glow" />
-          <h2 className="font-heading text-xl font-bold mt-3">{displayUser.name}</h2>
-          <p className="text-sm text-muted-foreground">@{displayUser.username}</p>
-          {displayUser.bio && <p className="text-sm text-center mt-1 px-8 text-muted-foreground">{displayUser.bio}</p>}
-          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin size={12} />{displayUser.city}</p>
-        </div>
+        {/* Hero card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="px-5 pt-6"
+        >
+          <div className="card-stage p-5 relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-secondary/10 blur-3xl pointer-events-none" />
 
-        {/* Stats */}
-        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-4 gap-2 px-6 mt-4">
-          {[
-            { label: "Games", value: displayUser.totalGames },
-            { label: "Followers", value: displayUser.followersCount, link: `/followers/${actualId}` },
-            { label: "Following", value: displayUser.followingCount, link: `/followers/${actualId}` },
-            { label: "Rating", value: displayUser.rating },
-          ].map(s => (
-            <motion.button key={s.label} variants={item}
-              onClick={() => s.link && navigate(s.link)}
-              className="card-premium text-center p-2">
-              <p className="font-bold text-lg gradient-text">{s.value}</p>
-              <p className="text-[10px] text-muted-foreground">{s.label}</p>
-            </motion.button>
-          ))}
+            <div className="relative flex items-start gap-4">
+              <div className="avatar-ring shrink-0">
+                <div className="w-20 h-20 rounded-full bg-card overflow-hidden">
+                  {displayUser.avatarUrl ? (
+                    <img src={displayUser.avatarUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-display font-bold text-3xl">{displayUser.name?.[0]}</div>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display font-bold text-2xl truncate">{displayUser.name}</h2>
+                </div>
+                <p className="text-[11px] font-mono text-muted-foreground">@{displayUser.username}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className={`tag tag-lime ${tierClass}`}>
+                    <Trophy size={10} strokeWidth={3} />
+                    {tier}
+                  </div>
+                  <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
+                    <MapPin size={10} />
+                    {displayUser.city}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {displayUser.bio && (
+              <p className="text-sm text-foreground/80 mt-4 leading-relaxed">{displayUser.bio}</p>
+            )}
+
+            {/* XP / tier bar */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Zap size={11} className="text-primary" strokeWidth={3} />
+                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{karma} XP</span>
+                </div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">→ {nextTier}</span>
+              </div>
+              <div className="xp-bar">
+                <div className="xp-bar-fill" style={{ width: `${tierProgress}%` }} />
+              </div>
+            </div>
+          </div>
         </motion.div>
 
-        {/* Actions */}
-        <div className="flex gap-3 px-6 mt-4">
+        {/* Stat grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="px-5 mt-3"
+        >
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "Games", value: displayUser.totalGames || 0 },
+              { label: "Followers", value: displayUser.followersCount || 0, link: `/followers/${actualId}` },
+              { label: "Following", value: displayUser.followingCount || 0, link: `/followers/${actualId}` },
+              { label: "Rating", value: displayUser.rating || "0.0" },
+            ].map((s, i) => (
+              <motion.button
+                key={s.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.05 }}
+                onClick={() => s.link && navigate(s.link)}
+                className="card-stage p-3 text-center"
+              >
+                <div className="font-display font-bold text-xl num leading-none">{s.value}</div>
+                <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground mt-1">{s.label}</div>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Action buttons */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="px-5 mt-4 flex gap-2"
+        >
           {isMe ? (
-            <button onClick={() => navigate("/profile/me/edit")} className="btn-secondary flex-1 py-2.5 rounded-xl text-sm font-semibold">Edit Profile</button>
+            <button
+              onClick={() => navigate("/profile/me/edit")}
+              className="flex-1 py-3 rounded-2xl bg-white/[0.04] border border-white/10 font-display font-bold text-sm"
+            >
+              Edit profile
+            </button>
           ) : (
             <>
-              <motion.button whileTap={{ scale: 0.95 }} onClick={handleFollow}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${displayUser.isFollowing ? "btn-secondary" : "btn-primary"}`}
-              >{displayUser.isFollowing ? "Following" : "Follow"}</motion.button>
-              <motion.button whileTap={{ scale: 0.95 }} onClick={handleMessage}
-                className="btn-secondary flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-1">
-                <MessageCircle size={14} /> Message
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleFollow}
+                className={`flex-1 py-3 rounded-2xl font-display font-bold text-sm transition-all ${
+                  displayUser.isFollowing
+                    ? "bg-white/[0.04] border border-white/10 text-foreground"
+                    : "bg-primary text-primary-foreground"
+                }`}
+                style={!displayUser.isFollowing ? { boxShadow: "0 0 24px hsla(73, 100%, 50%, 0.4)" } : undefined}
+              >
+                {displayUser.isFollowing ? "Following" : "Follow"}
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleMessage}
+                className="px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/10 font-display font-bold text-sm flex items-center gap-1.5"
+              >
+                <MessageCircle size={14} strokeWidth={2.5} />
+                Message
               </motion.button>
             </>
           )}
-        </div>
+        </motion.div>
 
-        {/* Badges */}
+        {/* Achievements / badges */}
         {displayUser.badges && displayUser.badges.length > 0 && (
-          <div className="px-4 mt-4">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {displayUser.badges.map((b: any, i: number) => (
-                <span key={i} className="gradient-primary-subtle px-3 py-1.5 rounded-full text-xs whitespace-nowrap">{b.icon} {b.label}</span>
-              ))}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mt-6"
+          >
+            <div className="px-5 mb-3">
+              <h3 className="font-display font-bold text-base">Achievements</h3>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">unlocked badges</p>
             </div>
-          </div>
-        )}
-
-        {/* Karma (own profile) */}
-        {isMe && (
-          <div className="px-6 mt-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>Karma</span><span>{displayUser.karma}</span>
+            <div className="overflow-x-auto px-5 scrollbar-hide">
+              <div className="flex gap-2 pb-1">
+                {displayUser.badges.map((b: any, i: number) => (
+                  <div key={i} className="card-stage px-4 py-2.5 shrink-0 flex items-center gap-2">
+                    <Trophy size={14} className="text-primary" strokeWidth={2.5} />
+                    <span className="font-display font-bold text-xs whitespace-nowrap">{b.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="h-2 bg-secondary rounded-full overflow-hidden">
-              <motion.div className="h-full gradient-primary rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (displayUser.karma || 0) / 30)}%` }}
-                transition={{ duration: 0.8 }} />
-            </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Sports */}
         {displayUser.sportsPlayed && displayUser.sportsPlayed.length > 0 && (
-          <div className="px-4 mt-4 flex flex-wrap gap-1.5">
-            {displayUser.sportsPlayed.map((s: string) => (
-              <span key={s} className="pill pill-inactive">{s}</span>
-            ))}
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="px-5 mt-5"
+          >
+            <h3 className="font-display font-bold text-base mb-2">Plays</h3>
+            <div className="flex flex-wrap gap-2">
+              {displayUser.sportsPlayed.map((s: string) => (
+                <span key={s} className="px-3 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] border border-white/10 text-foreground/70">
+                  {s}
+                </span>
+              ))}
+            </div>
+          </motion.div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 px-4 mt-5">
-          {["hosting", "reviews"].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`pill flex-1 py-2 text-sm font-medium ${activeTab === tab ? "pill-active" : "pill-inactive"}`}
-            >{tab === "hosting" ? "Hosting" : "Reviews"}</button>
-          ))}
-        </div>
-
-        <motion.div variants={container} initial="hidden" animate="show" className="px-4 mt-3 space-y-3">
-          {activeTab === "hosting" && (
-            hostedPools.length > 0 ? hostedPools.map(p => (
-              <motion.div key={p.id} variants={item}><PoolCard pool={p} /></motion.div>
-            )) : <p className="text-muted-foreground text-center py-4 text-sm">No hosted pools yet</p>
-          )}
-          {activeTab === "reviews" && (
-            reviews.length > 0 ? reviews.map((r: any) => (
-              <motion.div key={r.id} variants={item} className="card-premium p-3">
-                <div className="flex items-center gap-2">
-                  <img src={r.reviewerAvatar || ""} className="w-8 h-8 rounded-full avatar-ring" />
-                  <div>
-                    <p className="text-sm font-medium">{r.reviewerName}</p>
-                    <div className="flex">{Array.from({ length: r.rating }, (_, i) => <Star key={i} size={10} className="text-yellow-400 fill-yellow-400" />)}</div>
-                  </div>
-                </div>
-                {r.text && <p className="text-sm text-muted-foreground mt-2">{r.text}</p>}
-              </motion.div>
-            )) : <p className="text-muted-foreground text-center py-4 text-sm">No reviews yet</p>
-          )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35 }}
+          className="px-5 mt-7"
+        >
+          <div className="flex gap-1 p-1 rounded-full bg-white/[0.04] border border-white/10">
+            {["hosting", "reviews"].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all ${
+                  activeTab === tab
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/60"
+                }`}
+              >
+                {tab === "hosting" ? "Hosting" : "Reviews"}
+              </button>
+            ))}
+          </div>
         </motion.div>
 
+        {/* Tab content */}
+        <div className="px-5 mt-4 space-y-3">
+          {activeTab === "hosting" && (
+            hostedPools.length > 0 ? hostedPools.map((p, i) => (
+              <PoolCard key={p.id} pool={p} index={i} />
+            )) : (
+              <div className="text-center py-12">
+                <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider">no hosted pools yet</p>
+              </div>
+            )
+          )}
+          {activeTab === "reviews" && (
+            reviews.length > 0 ? reviews.map((r: any, i: number) => (
+              <motion.div
+                key={r.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="card-stage p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="avatar-ring">
+                    <div className="w-10 h-10 rounded-full bg-card overflow-hidden">
+                      {r.reviewerAvatar ? (
+                        <img src={r.reviewerAvatar} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-display font-bold text-xs">{r.reviewerName?.[0]}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-display font-bold text-sm">{r.reviewerName}</p>
+                    <div className="flex gap-0.5 mt-0.5">
+                      {Array.from({ length: r.rating }, (_, i) => (
+                        <Star key={i} size={10} className="text-primary fill-primary" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {r.text && <p className="text-sm text-foreground/80 mt-3 leading-relaxed">{r.text}</p>}
+              </motion.div>
+            )) : (
+              <div className="text-center py-12">
+                <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider">no reviews yet</p>
+              </div>
+            )
+          )}
+        </div>
+
         {isMe && <BottomNav />}
-      </motion.div>
+      </div>
     </MobileFrame>
   );
 };

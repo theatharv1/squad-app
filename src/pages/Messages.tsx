@@ -6,15 +6,6 @@ import { useConversations } from "@/hooks/useMessages";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileFrame } from "@/components/layout/MobileFrame";
 
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
-};
-
 const Messages = () => {
   const [filter, setFilter] = useState("all");
   const navigate = useNavigate();
@@ -28,62 +19,109 @@ const Messages = () => {
     const d = new Date(ts);
     const now = new Date();
     if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }).toUpperCase();
   };
 
   return (
     <MobileFrame>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-24">
-        <div className="sticky top-0 z-30 glass-strong px-4 pt-4 pb-2">
+      <div className="min-h-screen pb-28">
+        {/* Header */}
+        <div className="sticky top-0 z-30 glass-strong px-5 pt-5 pb-4">
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           <div className="flex items-center justify-between">
-            <h1 className="font-heading text-2xl font-bold">Messages</h1>
-            <button className="p-2"><PenSquare size={20} /></button>
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">Inbox</div>
+              <h1 className="font-display font-bold text-2xl mt-0.5">Squad chats</h1>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <PenSquare size={16} strokeWidth={2.2} />
+            </motion.button>
           </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mt-2" />
         </div>
 
-        <div className="flex gap-2 px-4 mt-3">
-          {["all", "group", "dm"].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`pill ${filter === f ? "pill-active" : "pill-inactive"}`}
-            >{f === "all" ? "All" : f === "group" ? "Activity Chats" : "Direct"}</button>
-          ))}
-        </div>
+        {/* Filter pills */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="px-5 mt-5"
+        >
+          <div className="flex gap-2">
+            {[
+              { id: "all", label: "All" },
+              { id: "group", label: "Squads" },
+              { id: "dm", label: "DMs" },
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`px-4 py-2 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all ${
+                  filter === f.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white/[0.04] border border-white/10 text-foreground/70"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </motion.div>
 
-        <div className="mt-3">
+        {/* Conversations */}
+        <div className="px-5 mt-5">
           {isLoading ? (
-            <div className="space-y-2 px-4">
-              {[1,2,3].map(i => <div key={i} className="shimmer rounded-2xl h-16" />)}
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="card-stage h-16 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" style={{ animation: "shimmer 2s infinite" }} />
+                </div>
+              ))}
             </div>
           ) : filtered.length > 0 ? (
-            <motion.div variants={container} initial="hidden" animate="show">
-              {filtered.map(conv => (
-                <motion.div key={conv.id} variants={item}
-                  whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02, y: -2 }}
+            <div className="space-y-2">
+              {filtered.map((conv, i) => (
+                <motion.button
+                  key={conv.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => navigate(`/messages/${conv.id}`)}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-colors">
-                  <div className="relative shrink-0">
-                    <img src={conv.avatar} className="w-12 h-12 rounded-full object-cover avatar-ring" />
+                  className="card-stage w-full p-4 flex items-center gap-3 text-left"
+                >
+                  <div className="avatar-ring shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-card overflow-hidden">
+                      {conv.avatar ? (
+                        <img src={conv.avatar} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-display font-bold">{conv.name?.[0]}</div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm truncate">{conv.emoji ? `${conv.emoji} ` : ""}{conv.name}</p>
-                      <span className="text-xs text-muted-foreground shrink-0">{formatTime(conv.timestamp)}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-display font-bold text-sm truncate">{conv.name}</p>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">{formatTime(conv.timestamp)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {conv.isGroup && conv.lastSender ? `${conv.lastSender}: ` : ""}{conv.lastMessage}
+                    <p className="text-xs text-foreground/60 truncate mt-0.5">
+                      {conv.isGroup && conv.lastSender ? <span className="text-primary">{conv.lastSender}: </span> : ""}
+                      {conv.lastMessage}
                     </p>
                   </div>
-                </motion.div>
+                </motion.button>
               ))}
-            </motion.div>
+            </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">No conversations yet</p>
+            <div className="text-center py-16">
+              <p className="text-sm text-muted-foreground font-mono uppercase tracking-wider">no chats yet</p>
+            </div>
           )}
         </div>
 
         <BottomNav />
-      </motion.div>
+      </div>
     </MobileFrame>
   );
 };

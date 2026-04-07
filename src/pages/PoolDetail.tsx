@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, MapPin, Clock, Users, IndianRupee, MessageCircle } from "lucide-react";
+import { ArrowLeft, Share2, MapPin, Clock, IndianRupee, MessageCircle, Star } from "lucide-react";
 import { CATEGORIES } from "@/constants";
 import { usePool, useJoinPool, useLeavePool, usePools } from "@/hooks/usePools";
 import { useFollow, useUnfollow } from "@/hooks/useUsers";
@@ -9,15 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PoolCard } from "@/components/PoolCard";
 import { MobileFrame } from "@/components/layout/MobileFrame";
 import { toast } from "sonner";
-
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
-};
 
 const PoolDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,13 +24,12 @@ const PoolDetail = () => {
 
   if (isLoading || !pool) return (
     <MobileFrame>
-      <div className="min-h-screen bg-background p-4 space-y-4">
-        <div className="shimmer rounded-2xl h-32" />
-        <div className="shimmer rounded-2xl h-8 w-3/4" />
-        <div className="shimmer rounded-2xl h-20" />
-        <div className="grid grid-cols-2 gap-2">
-          <div className="shimmer rounded-2xl h-20" />
-          <div className="shimmer rounded-2xl h-20" />
+      <div className="min-h-screen p-5 space-y-4">
+        <div className="card-stage h-48 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" style={{ animation: "shimmer 2s infinite" }} />
+        </div>
+        <div className="card-stage h-32 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" style={{ animation: "shimmer 2s infinite" }} />
         </div>
       </div>
     </MobileFrame>
@@ -47,9 +37,12 @@ const PoolDetail = () => {
 
   const category = CATEGORIES.find(c => c.id === pool.category);
   const spotsLeft = pool.spotsTotal - pool.spotsFilled;
+  const fillPercent = Math.round((pool.spotsFilled / pool.spotsTotal) * 100);
   const time = new Date(pool.scheduledTime);
   const timeStr = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const dateStr = time.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const dateStr = time.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const dayNum = time.getDate();
+  const monthStr = time.toLocaleDateString([], { month: "short" }).toUpperCase();
 
   const handleJoin = async () => {
     try {
@@ -58,153 +51,313 @@ const PoolDetail = () => {
         toast("Left pool");
       } else {
         await joinMutation.mutateAsync(pool.id);
-        toast.success("Joined pool!");
+        toast.success("You're in");
       }
     } catch (err: any) { toast.error(err.message); }
   };
 
   const handleShare = async () => {
     if (navigator.share) {
-      await navigator.share({ title: pool.title, text: `Join "${pool.title}" on SQUAD!`, url: window.location.href });
+      await navigator.share({ title: pool.title, text: `Join "${pool.title}" on SQUAD`, url: window.location.href });
     } else {
       await navigator.clipboard.writeText(window.location.href);
-      toast.success("Link copied!");
+      toast.success("Link copied");
     }
   };
 
   return (
     <MobileFrame>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background pb-24">
-        {/* Hero Header */}
-        <div className="h-32 bg-secondary flex items-center justify-center text-5xl relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
-          <span className="relative z-10">{pool.emoji}</span>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate(-1)}
-            className="absolute top-4 left-4 glass rounded-full p-2 z-10">
-            <ArrowLeft size={18} className="text-white" />
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={handleShare}
-            className="absolute top-4 right-4 glass rounded-full p-2 z-10">
-            <Share2 size={18} className="text-white" />
-          </motion.button>
-        </div>
+      <div className="min-h-screen pb-32">
+        {/* Hero gradient */}
+        <div className="relative h-72 overflow-hidden">
+          <div className="absolute inset-0 gradient-stage" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-primary/20 blur-[100px]" />
+          <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-secondary/15 blur-[80px]" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-background" />
 
-        <div className="px-4 -mt-4 relative z-10">
-          {/* Status */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${spotsLeft === 0 ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
-              {spotsLeft === 0 ? "Full" : `${spotsLeft} spots left`}
-            </span>
-            {pool.isLive && (
-              <span className="flex items-center gap-1 text-xs text-green-400 live-glow">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Live now
-              </span>
-            )}
+          {/* Header buttons */}
+          <div className="absolute top-5 left-0 right-0 flex items-center justify-between px-5 z-10">
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={handleShare}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <Share2 size={18} strokeWidth={2.5} />
+            </motion.button>
           </div>
 
-          <h1 className="font-heading text-2xl font-bold">{pool.title}</h1>
+          {/* Hero content */}
+          <div className="relative z-10 h-full flex flex-col justify-end px-5 pb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">{category?.label || pool.category}</span>
+              {pool.isLive && (
+                <div className="tag tag-live">
+                  <span className="pulse-dot" />
+                  Live
+                </div>
+              )}
+            </div>
+            <h1 className="text-display font-bold leading-none">{pool.title}</h1>
+            <p className="text-sm text-muted-foreground mt-2">at {pool.venue}</p>
+          </div>
+        </div>
 
-          {/* Host */}
-          <motion.div whileHover={{ scale: 1.02, y: -2 }}
-            className="card-premium flex items-center gap-3 mt-4 p-3 cursor-pointer">
-            <img src={pool.host.avatar || ""} className="w-10 h-10 rounded-full avatar-ring cursor-pointer" onClick={() => navigate(`/profile/${pool.host.id}`)} />
-            <div className="flex-1">
-              <p className="font-medium text-sm">{pool.host.name}</p>
-              <p className="text-xs text-muted-foreground">&#11088; {pool.host.rating} · {pool.host.showUpRate}% shows up</p>
+        {/* Body */}
+        <div className="px-5 -mt-4 relative z-10">
+          {/* Quick stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-stage p-5 grid grid-cols-3 gap-4"
+          >
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">When</div>
+              <div className="font-display font-bold text-lg num leading-none mt-1">{dayNum}</div>
+              <div className="text-[10px] font-mono text-primary mt-0.5">{monthStr} · {timeStr}</div>
+            </div>
+            <div className="border-l border-white/5 pl-4">
+              <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Spots</div>
+              <div className="font-display font-bold text-lg num leading-none mt-1">{spotsLeft}</div>
+              <div className="text-[10px] font-mono text-primary mt-0.5">left of {pool.spotsTotal}</div>
+            </div>
+            <div className="border-l border-white/5 pl-4">
+              <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Cost</div>
+              <div className="font-display font-bold text-lg num leading-none mt-1">{pool.costPerHead > 0 ? `₹${pool.costPerHead}` : "Free"}</div>
+              <div className="text-[10px] font-mono text-primary mt-0.5">per head</div>
+            </div>
+          </motion.div>
+
+          {/* XP fill */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mt-4"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Squad filling</span>
+              <span className="text-[11px] font-mono num text-primary font-bold">{fillPercent}%</span>
+            </div>
+            <div className="xp-bar">
+              <div className="xp-bar-fill" style={{ width: `${fillPercent}%` }} />
+            </div>
+          </motion.div>
+
+          {/* Host card */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="card-stage p-4 mt-5 flex items-center gap-3"
+          >
+            <button onClick={() => navigate(`/profile/${pool.host.id}`)} className="avatar-ring shrink-0">
+              <div className="w-12 h-12 rounded-full bg-card overflow-hidden">
+                {pool.host.avatar ? (
+                  <img src={pool.host.avatar} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-display font-bold">{pool.host.name?.[0]}</div>
+                )}
+              </div>
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Hosted by</div>
+              <p className="font-display font-bold text-sm truncate">{pool.host.name}</p>
+              <div className="flex items-center gap-2 mt-0.5 text-[11px] font-mono text-muted-foreground">
+                <span className="flex items-center gap-0.5">
+                  <Star size={10} className="text-primary fill-primary" />
+                  <span className="num text-foreground/80">{pool.host.rating}</span>
+                </span>
+                <span>·</span>
+                <span className="num text-foreground/80">{pool.host.showUpRate}%</span>
+                <span className="text-[9px] uppercase">show rate</span>
+              </div>
             </div>
             {pool.host.id !== user?.id && (
-              <button onClick={async () => {
-                if (isFollowingHost) { await unfollowMutation.mutateAsync(pool.host.id); setIsFollowingHost(false); }
-                else { await followMutation.mutateAsync(pool.host.id); setIsFollowingHost(true); }
-              }} className={isFollowingHost ? "btn-secondary px-3 py-1 rounded-full text-xs font-semibold" : "btn-primary px-3 py-1 rounded-full text-xs font-semibold"}>
+              <button
+                onClick={async () => {
+                  if (isFollowingHost) { await unfollowMutation.mutateAsync(pool.host.id); setIsFollowingHost(false); }
+                  else { await followMutation.mutateAsync(pool.host.id); setIsFollowingHost(true); }
+                }}
+                className={`px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all ${
+                  isFollowingHost
+                    ? "bg-white/[0.04] border border-white/10 text-foreground/70"
+                    : "bg-primary text-primary-foreground"
+                }`}
+              >
                 {isFollowingHost ? "Following" : "Follow"}
               </button>
             )}
           </motion.div>
 
-          {/* Info Grid */}
-          <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-2 mt-4">
-            {[
-              { icon: MapPin, label: pool.area, sub: pool.venue },
-              { icon: Clock, label: timeStr, sub: dateStr },
-              { icon: IndianRupee, label: pool.costPerHead > 0 ? `₹${pool.costPerHead}` : "Free", sub: "per head" },
-              { icon: Users, label: `${pool.spotsFilled}/${pool.spotsTotal}`, sub: "joined" },
-            ].map((info, i) => (
-              <motion.div key={i} variants={item} className="card-premium p-3">
-                <info.icon size={14} className="text-muted-foreground mb-1" />
-                <p className="text-sm font-medium">{info.label}</p>
-                <p className="text-xs text-muted-foreground">{info.sub}</p>
-              </motion.div>
-            ))}
+          {/* Where */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="card-stage p-4 mt-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <MapPin size={16} className="text-primary" strokeWidth={2.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Location</div>
+                <p className="font-display font-bold text-base mt-0.5">{pool.area}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{pool.venue}</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Time */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="card-stage p-4 mt-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 border border-secondary/20">
+                <Clock size={16} className="text-secondary" strokeWidth={2.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Schedule</div>
+                <p className="font-display font-bold text-base mt-0.5">{dateStr}</p>
+                <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{timeStr}</p>
+              </div>
+            </div>
           </motion.div>
 
           {/* Description */}
           {pool.description && (
-            <div className="mt-4">
-              <h3 className="font-semibold text-sm mb-1">About</h3>
-              <p className="text-sm text-muted-foreground">{pool.description}</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mt-5"
+            >
+              <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary mb-2">// About</div>
+              <p className="text-sm text-foreground/80 leading-relaxed">{pool.description}</p>
+            </motion.div>
           )}
 
           {/* Tags */}
           {pool.tags && pool.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {pool.tags.map(t => <span key={t} className="pill pill-inactive text-xs">{t}</span>)}
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-wrap gap-2 mt-4"
+            >
+              {pool.tags.map(t => (
+                <span key={t} className="px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] border border-white/10 text-foreground/70">
+                  #{t}
+                </span>
+              ))}
+            </motion.div>
           )}
 
           {/* Participants */}
           {pool.participants && pool.participants.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-semibold text-sm mb-2">Who's joining</h3>
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="mt-6"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-bold text-base">The squad</h3>
+                <span className="text-[11px] font-mono num text-primary">{pool.spotsFilled}/{pool.spotsTotal}</span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {pool.participants.map(p => (
-                  <div key={p.id} className="flex flex-col items-center shrink-0 cursor-pointer" onClick={() => navigate(`/profile/${p.id}`)}>
-                    <img src={p.avatarUrl || ""} className="w-10 h-10 rounded-full avatar-ring" />
-                    <span className="text-[10px] mt-1 text-muted-foreground">{p.name.split(" ")[0]}</span>
-                  </div>
+                  <button
+                    key={p.id}
+                    onClick={() => navigate(`/profile/${p.id}`)}
+                    className="flex flex-col items-center shrink-0 gap-1.5 w-14"
+                  >
+                    <div className="avatar-ring">
+                      <div className="w-11 h-11 rounded-full bg-card overflow-hidden">
+                        {p.avatarUrl ? (
+                          <img src={p.avatarUrl} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-display font-bold text-xs">{p.name[0]}</div>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-mono uppercase tracking-wider truncate w-full text-center text-muted-foreground">{p.name.split(" ")[0]}</span>
+                  </button>
                 ))}
                 {Array.from({ length: Math.max(0, pool.spotsTotal - pool.spotsFilled) }, (_, i) => (
-                  <div key={`empty-${i}`} className="w-10 h-10 rounded-full bg-secondary border-2 border-dashed border-border shrink-0" />
+                  <div key={`empty-${i}`} className="w-11 h-11 rounded-full border-2 border-dashed border-white/10 shrink-0 mt-0" />
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* Chat link */}
+          {/* Pool chat */}
           {pool.conversationId && pool.joined && (
-            <motion.button whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}
+            <motion.button
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => navigate(`/messages/${pool.conversationId}`)}
-              className="card-premium w-full mt-4 p-3 flex items-center gap-2 text-sm font-medium">
-              <MessageCircle size={16} /> Pool Chat
+              className="card-stage w-full mt-5 p-4 flex items-center gap-3"
+            >
+              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center border border-accent/20">
+                <MessageCircle size={16} className="text-accent" strokeWidth={2.5} />
+              </div>
+              <div className="text-left flex-1">
+                <p className="font-display font-bold text-sm">Squad chat</p>
+                <p className="text-[11px] text-muted-foreground">drop in and say hi</p>
+              </div>
+              <div className="text-primary text-xl">→</div>
             </motion.button>
           )}
 
           {/* Similar */}
           {similarPools.filter(p => p.id !== pool.id).length > 0 && (
-            <div className="mt-6">
-              <h3 className="font-semibold text-sm mb-2">Similar Pools</h3>
-              <motion.div variants={container} initial="hidden" animate="show" className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-                {similarPools.filter(p => p.id !== pool.id).map(p => (
-                  <motion.div key={p.id} variants={item} className="min-w-[250px]"><PoolCard pool={p} variant="compact" /></motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="mt-7"
+            >
+              <h3 className="font-display font-bold text-base mb-3">More like this</h3>
+              <div className="space-y-3">
+                {similarPools.filter(p => p.id !== pool.id).map((p, i) => (
+                  <PoolCard key={p.id} pool={p} variant="compact" index={i} />
                 ))}
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
           )}
         </div>
 
-        {/* Sticky Join Button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 glass-strong z-20">
-          <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mb-3" />
-          <div className="max-w-[430px] mx-auto">
-            <motion.button whileTap={{ scale: 0.97 }} onClick={handleJoin}
-              disabled={joinMutation.isPending || leaveMutation.isPending || (!pool.joined && spotsLeft === 0)}
-              className={`w-full py-3.5 rounded-xl font-bold disabled:opacity-50 ${pool.joined ? "btn-secondary" : "btn-primary shadow-glow"}`}>
-              {pool.joined ? "Leave Pool" : pool.costPerHead > 0 ? `Join & Pay ₹${pool.costPerHead}` : "Join Pool"}
-            </motion.button>
-          </div>
+        {/* Sticky CTA */}
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30 px-5 pb-5 pt-4 glass-strong">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleJoin}
+            disabled={joinMutation.isPending || leaveMutation.isPending || (!pool.joined && spotsLeft === 0)}
+            className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all disabled:opacity-50 ${
+              pool.joined
+                ? "bg-white/[0.06] border border-white/10 text-foreground"
+                : "bg-primary text-primary-foreground"
+            }`}
+            style={!pool.joined ? { boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.4)" } : undefined}
+          >
+            {pool.joined ? "You're in · Leave?" : pool.costPerHead > 0 ? `Reserve · ₹${pool.costPerHead}` : "Reserve spot"}
+          </motion.button>
         </div>
-      </motion.div>
+      </div>
     </MobileFrame>
   );
 };
