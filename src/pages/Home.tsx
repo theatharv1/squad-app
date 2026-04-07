@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Bell, ChevronDown, Search, TrendingUp, Zap } from "lucide-react";
@@ -11,7 +11,12 @@ import { PoolCard } from "@/components/PoolCard";
 import { Stories } from "@/components/Stories";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileFrame } from "@/components/layout/MobileFrame";
+import { StreakBadge } from "@/components/StreakBadge";
+import { ActivityTicker } from "@/components/ActivityTicker";
+import { TonightVibe } from "@/components/TonightVibe";
+import { WeeklyRitual } from "@/components/WeeklyRitual";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { trackOpen, getTimeContext, getXPToday, DAILY_XP_GOAL } from "@/lib/engagement";
 
 const Home = () => {
   const { user } = useAuth();
@@ -25,16 +30,23 @@ const Home = () => {
   const { data: notifData } = useNotifications();
   const unreadCount = notifData?.unreadCount || 0;
 
+  useEffect(() => { trackOpen(); }, []);
+
   const handleCityChange = (c: string) => { setLocalCity(c); saveCity(c); setCitySheetOpen(false); };
   const livePools = allPools.filter(p => p.isLive);
-  const trendingPools = [...allPools].sort((a, b) => b.spotsFilled - a.spotsFilled).slice(0, 3);
 
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Tonight";
-  })();
+  const ctx = useMemo(() => getTimeContext(), []);
+  const xpToday = getXPToday();
+  const xpPercent = Math.min(100, Math.round((xpToday / DAILY_XP_GOAL) * 100));
+
+  // Wildcard pool — variable reward (TikTok/Hinge "Most Compatible" pattern).
+  // Pick a different category from user's normal flow, deterministic per day.
+  const wildcardPool = useMemo(() => {
+    if (!allPools.length) return null;
+    const dayKey = new Date().getDate();
+    const off = allPools.find((p, i) => i % 5 === dayKey % 5 && p.category !== filter);
+    return off || null;
+  }, [allPools, filter]);
 
   return (
     <MobileFrame>
@@ -79,6 +91,7 @@ const Home = () => {
             </Sheet>
 
             <div className="flex items-center gap-2">
+              <StreakBadge size="sm" onClick={() => navigate("/profile/me")} />
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 onClick={() => navigate("/explore")}
@@ -119,17 +132,41 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Greeting hero */}
+        {/* Greeting hero — time-aware */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="px-5 pt-6"
         >
-          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">{greeting}, {user?.name?.split(" ")[0] || "player"}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">{ctx.eyebrow} · {user?.name?.split(" ")[0] || "player"}</div>
           <h1 className="text-display-lg mt-2">
-            What's the <span className="text-gradient-cyan-magenta">move</span>
+            {ctx.greeting}, what's the <span className="text-gradient-cyan-magenta">move</span>
           </h1>
+          {/* Daily XP progress — Duolingo daily goal pattern */}
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 xp-bar h-1.5">
+              <motion.div
+                className="xp-bar-fill"
+                initial={{ width: 0 }}
+                animate={{ width: `${xpPercent}%` }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-foreground/60 num">
+              {xpToday}/{DAILY_XP_GOAL} XP
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Activity ticker — live social proof */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="px-5 mt-5"
+        >
+          <ActivityTicker pools={allPools} />
         </motion.div>
 
         {/* Stories */}
@@ -137,16 +174,31 @@ const Home = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="px-5 mt-6"
+          className="px-5 mt-5"
         >
           <Stories pools={allPools} />
         </motion.div>
+
+        {/* Tonight Vibe — daily check-in (BeReal pattern) */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13 }}
+          className="px-5 mt-4"
+        >
+          <TonightVibe />
+        </motion.div>
+
+        {/* Weekly Ritual (Tue-Wed only) — Timeleft pattern */}
+        <div className="px-5 mt-4">
+          <WeeklyRitual />
+        </div>
 
         {/* Bento — live now + trending */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
+          transition={{ delay: 0.17, duration: 0.5 }}
           className="px-5 mt-4"
         >
           <div className="grid grid-cols-2 gap-3">
@@ -218,7 +270,7 @@ const Home = () => {
           >
             <div className="px-5 flex items-center justify-between mb-3">
               <div>
-                <h2 className="font-display font-bold text-xl">Tonight's setlist</h2>
+                <h2 className="font-display font-bold text-xl">{ctx.tabName}'s setlist</h2>
                 <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">happening today</p>
               </div>
               <button onClick={() => navigate("/explore")} className="text-[11px] font-mono uppercase tracking-wider text-primary">
@@ -234,6 +286,22 @@ const Home = () => {
                 ))}
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* Wildcard — variable reward */}
+        {wildcardPool && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-7 px-5"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-pink-400">// Wildcard pick</div>
+              <div className="h-px flex-1 bg-gradient-to-r from-pink-500/30 via-pink-500/10 to-transparent" />
+            </div>
+            <PoolCard pool={wildcardPool} variant="ticket" index={0} />
           </motion.div>
         )}
 

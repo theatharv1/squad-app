@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPin, Clock, Users, IndianRupee, ArrowUpRight } from "lucide-react";
+import { MapPin, Clock, Users, IndianRupee, ArrowUpRight, Eye, Flame } from "lucide-react";
 import { CATEGORIES } from "@/constants";
 import { useJoinPool, useLeavePool } from "@/hooks/usePools";
+import { getPoolUrgency, addXP } from "@/lib/engagement";
 import type { Pool } from "@/types";
 import { toast } from "sonner";
 
@@ -12,6 +13,78 @@ interface Props {
   index?: number;
 }
 
+// Deterministic synthetic helpers (until backend has real data) — these
+// produce consistent values for the same pool so the UI feels stable.
+function hashSeed(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function viewersNow(pool: Pool): number {
+  const seed = hashSeed(pool.id);
+  const base = 2 + (seed % 9);
+  return pool.isLive ? base + 4 : base;
+}
+function mutualsCount(pool: Pool): number {
+  const seed = hashSeed(pool.id + "mut");
+  return seed % 4; // 0-3
+}
+
+function MutualAvatars({ count }: { count: number }) {
+  if (count === 0) return null;
+  const colors = [
+    "bg-gradient-to-br from-primary/60 to-primary/30",
+    "bg-gradient-to-br from-pink-500/60 to-pink-500/30",
+    "bg-gradient-to-br from-cyan-400/60 to-cyan-400/30",
+  ];
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex -space-x-1.5">
+        {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-4 h-4 rounded-full border border-background ${colors[i % colors.length]}`}
+          />
+        ))}
+      </div>
+      <span className="text-[9px] font-mono uppercase tracking-wider text-foreground/70">
+        {count === 1 ? "1 friend going" : `${count} friends going`}
+      </span>
+    </div>
+  );
+}
+
+function UrgencyChip({ pool }: { pool: Pool }) {
+  const u = getPoolUrgency(pool);
+  if (!u) return null;
+  const styles = {
+    magenta: "bg-pink-500/15 border-pink-500/40 text-pink-400",
+    lime: "bg-primary/15 border-primary/40 text-primary",
+    cyan: "bg-cyan-400/15 border-cyan-400/40 text-cyan-300",
+  } as const;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-mono uppercase tracking-wider font-bold ${
+        styles[u.color as keyof typeof styles]
+      } ${u.level === "live" ? "animate-pulse" : ""}`}
+    >
+      {u.level === "live" && <span className="pulse-dot" />}
+      {u.level === "hot" && <Flame size={9} strokeWidth={3} fill="currentColor" />}
+      {u.label}
+    </span>
+  );
+}
+
+function ViewersNow({ pool }: { pool: Pool }) {
+  const n = viewersNow(pool);
+  return (
+    <span className="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider text-cyan-300/80">
+      <Eye size={9} strokeWidth={2.5} />
+      <span className="num">{n}</span> viewing
+    </span>
+  );
+}
+
 export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
   const navigate = useNavigate();
   const joinMutation = useJoinPool();
@@ -19,6 +92,7 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
   const category = CATEGORIES.find(c => c.id === pool.category);
   const spotsLeft = pool.spotsTotal - pool.spotsFilled;
   const fillPercent = Math.round((pool.spotsFilled / pool.spotsTotal) * 100);
+  const mutuals = mutualsCount(pool);
 
   const handleJoin = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -28,7 +102,8 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
         toast("Left pool");
       } else {
         await joinMutation.mutateAsync(pool.id);
-        toast.success("Joined");
+        addXP(10);
+        toast.success("Joined · +10 XP");
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -60,12 +135,7 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-display font-bold text-base leading-tight truncate">{pool.title}</h3>
-              {pool.isLive && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="pulse-dot" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-red-400">Live</span>
-                </div>
-              )}
+              <UrgencyChip pool={pool} />
             </div>
             <p className="text-xs text-muted-foreground mt-1 truncate">{pool.area} · {timeStr}</p>
             <div className="flex items-center gap-3 mt-2">
@@ -74,6 +144,12 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
                 <div className="xp-bar-fill" style={{ width: `${fillPercent}%` }} />
               </div>
             </div>
+            {(mutuals > 0 || pool.isLive) && (
+              <div className="flex items-center gap-3 mt-2">
+                <MutualAvatars count={mutuals} />
+                {pool.isLive && <ViewersNow pool={pool} />}
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
@@ -92,29 +168,22 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
         className="relative cursor-pointer group"
       >
         <div className="card-ticket p-5 relative overflow-hidden">
-          {/* spotlight gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
 
           <div className="relative">
-            {/* header */}
             <div className="flex items-start justify-between mb-4">
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{category?.label || pool.category}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{category?.label || pool.category}</span>
+                  <UrgencyChip pool={pool} />
+                </div>
                 <h3 className="font-display text-2xl font-bold mt-1 leading-none">{pool.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1.5">hosted by {pool.host.name}</p>
               </div>
-              {pool.isLive && (
-                <div className="tag tag-live">
-                  <span className="pulse-dot" />
-                  Live
-                </div>
-              )}
             </div>
 
-            {/* dashed divider */}
             <div className="divider-dashed my-4" />
 
-            {/* meta row */}
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div>
                 <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">When</div>
@@ -133,8 +202,7 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
               </div>
             </div>
 
-            {/* xp bar for spots */}
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Squad filling</span>
                 <span className="text-[11px] font-mono num text-primary">{pool.spotsFilled}/{pool.spotsTotal}</span>
@@ -144,7 +212,13 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
               </div>
             </div>
 
-            {/* CTA */}
+            {(mutuals > 0 || true) && (
+              <div className="flex items-center justify-between mb-4">
+                <MutualAvatars count={mutuals} />
+                <ViewersNow pool={pool} />
+              </div>
+            )}
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
@@ -181,14 +255,9 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
       <div className="relative">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-primary">{category?.label}</span>
-              {pool.isLive && (
-                <span className="flex items-center gap-1">
-                  <span className="pulse-dot" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-red-400">Live</span>
-                </span>
-              )}
+              <UrgencyChip pool={pool} />
             </div>
             <h3 className="font-display font-bold text-xl leading-tight truncate">{pool.title}</h3>
             <p className="text-xs text-muted-foreground mt-1">by {pool.host.name}</p>
@@ -199,7 +268,7 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-mono mt-3">
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-mono mt-3 flex-wrap">
           <span className="flex items-center gap-1"><MapPin size={11} className="text-primary/80" />{pool.area}</span>
           <span className="flex items-center gap-1"><Clock size={11} className="text-primary/80" />{timeStr}</span>
           <span className="flex items-center gap-1"><Users size={11} className="text-primary/80" />{spotsLeft} left</span>
@@ -212,7 +281,15 @@ export const PoolCard = ({ pool, variant = "full", index = 0 }: Props) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-3">
+            <MutualAvatars count={mutuals} />
+            {mutuals === 0 && <ViewersNow pool={pool} />}
+          </div>
+          {mutuals > 0 && <ViewersNow pool={pool} />}
+        </div>
+
+        <div className="flex items-center justify-between mt-3.5">
           <div className="flex gap-1.5">
             {pool.tags?.slice(0, 2).map(tag => (
               <span key={tag} className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-foreground/60">{tag}</span>

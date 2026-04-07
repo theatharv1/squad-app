@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, MapPin, Clock, IndianRupee, MessageCircle, Star } from "lucide-react";
+import { ArrowLeft, Share2, MapPin, Clock, IndianRupee, MessageCircle, Star, Sparkles } from "lucide-react";
 import { CATEGORIES } from "@/constants";
 import { usePool, useJoinPool, useLeavePool, usePools } from "@/hooks/usePools";
 import { useFollow, useUnfollow } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { PoolCard } from "@/components/PoolCard";
+import { PostPoolKudos } from "@/components/PostPoolKudos";
 import { MobileFrame } from "@/components/layout/MobileFrame";
 import { toast } from "sonner";
 
@@ -21,6 +22,27 @@ const PoolDetail = () => {
   const followMutation = useFollow();
   const unfollowMutation = useUnfollow();
   const [isFollowingHost, setIsFollowingHost] = useState(false);
+  const [kudosOpen, setKudosOpen] = useState(false);
+
+  // Pool ended? — within last 12h is the kudos window (Strava + Hinge "We Met" pattern).
+  // Auto-open the kudos modal once per pool, only if user joined and hasn't dismissed.
+  const endedRecently = useMemo(() => {
+    if (!pool) return false;
+    const t = new Date(pool.scheduledTime).getTime();
+    const now = Date.now();
+    return t < now && now - t < 1000 * 60 * 60 * 12;
+  }, [pool]);
+
+  useEffect(() => {
+    if (!pool || !pool.joined || !endedRecently) return;
+    const key = `kudos_seen:${pool.id}`;
+    if (typeof window !== "undefined" && window.localStorage.getItem(key)) return;
+    const t = setTimeout(() => {
+      setKudosOpen(true);
+      window.localStorage.setItem(key, "1");
+    }, 700);
+    return () => clearTimeout(t);
+  }, [pool, endedRecently]);
 
   if (isLoading || !pool) return (
     <MobileFrame>
@@ -343,20 +365,44 @@ const PoolDetail = () => {
         {/* Sticky CTA */}
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-30 px-5 pb-5 pt-4 glass-strong">
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleJoin}
-            disabled={joinMutation.isPending || leaveMutation.isPending || (!pool.joined && spotsLeft === 0)}
-            className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all disabled:opacity-50 ${
-              pool.joined
-                ? "bg-white/[0.06] border border-white/10 text-foreground"
-                : "bg-primary text-primary-foreground"
-            }`}
-            style={!pool.joined ? { boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.4)" } : undefined}
-          >
-            {pool.joined ? "You're in · Leave?" : pool.costPerHead > 0 ? `Reserve · ₹${pool.costPerHead}` : "Reserve spot"}
-          </motion.button>
+          {pool.joined && endedRecently ? (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setKudosOpen(true)}
+              className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2 bg-primary text-primary-foreground"
+              style={{ boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.45)" }}
+            >
+              <Sparkles size={16} strokeWidth={2.5} fill="currentColor" />
+              Rate the night · +60 XP
+            </motion.button>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleJoin}
+              disabled={joinMutation.isPending || leaveMutation.isPending || (!pool.joined && spotsLeft === 0)}
+              className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all disabled:opacity-50 ${
+                pool.joined
+                  ? "bg-white/[0.06] border border-white/10 text-foreground"
+                  : "bg-primary text-primary-foreground"
+              }`}
+              style={!pool.joined ? { boxShadow: "0 0 32px hsla(73, 100%, 50%, 0.4)" } : undefined}
+            >
+              {pool.joined ? "You're in · Leave?" : pool.costPerHead > 0 ? `Reserve · ₹${pool.costPerHead}` : "Reserve spot"}
+            </motion.button>
+          )}
         </div>
+
+        {/* Post-Pool Kudos modal — Strava + Hinge "We Met" loop */}
+        <PostPoolKudos
+          open={kudosOpen}
+          poolTitle={pool.title}
+          attendees={(pool.participants || []).map(p => ({
+            id: p.id,
+            name: p.name,
+            avatarUrl: p.avatarUrl ?? null,
+          }))}
+          onClose={() => setKudosOpen(false)}
+        />
       </div>
     </MobileFrame>
   );
